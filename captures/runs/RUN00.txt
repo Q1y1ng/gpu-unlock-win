@@ -1,0 +1,33 @@
+RTX3090 AMD EXPERIMENTAL MANUAL UNLOCK
+RUN00
+Manual U starts one hardware transaction; Esc or timeout cancels. Hardware success unverified.
+BUILD MODE: EXPERIMENTAL MANUAL UNLOCK; compile-time profile=entryLatchedSs1Preserve. The shared I/O preflight banner above is superseded: exact-card checks and manual U can authorize one stock transaction.
+CHECK stage=secure-boot status=0
+CHECK stage=watchdog status=0
+PCI enumeration: status=0 handles=26
+PCI target matches=1 status=0
+target location: status=0
+config[00]=256010de 00100003 030000a1 00800010
+config[10]=5e000000 0000000c 00000040 0000000c
+config[20]=00000042 00005001 00000000 3ae817aa
+config[30]=fff80000 00000060 00000000 000001ff
+config[40]=3ae817aa 00000000 00000000 00000000
+config[50]=00000000 00000001 0023d6ce 00000000
+config[60]=48036801 00000008 00807805 00000000
+config[70]=00000000 00000000 0012b410 112c8de1
+config[80]=00092930 00454d04 10840140 00000000
+config[90]=00000000 00000000 00000000 00070813
+config[a0]=00000400 0180001e 001e0004 00000000
+config[b0]=00000000 01140009 00000000 00000000
+config[c0]=00000000 00000000 00050011 00b90000
+config[d0]=00ba0000 00000000 00000000 00000000
+config[e0]=00000000 00000000 00000000 00000000
+config[f0]=00000000 00000000 00000000 00000000
+target BDF=0:1:0.0 checks=1 pm=0x60 pcie=0x78 msi=0x68 msix=0
+CHECK stage=target status=0
+hybrid GOP enumeration: status=0 handles=2
+hybrid GOP PCI parent id=0x256010de target=0x256010de
+hybrid GOP[0] belongs to the target GPU; release would blank it
+hybrid GOP result: valid=0 pathful=0 pathless=0
+CHECK stage=display status=0x8000000000000003
+FINAL status=0x8000000000000003 stage=display attempted=0 driver_release=0 clean=1

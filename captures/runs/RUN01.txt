@@ -1,0 +1,88 @@
+RTX3090 AMD EXPERIMENTAL MANUAL UNLOCK
+RUN01
+Manual U starts one hardware transaction; Esc or timeout cancels. Hardware success unverified.
+BUILD MODE: EXPERIMENTAL MANUAL UNLOCK; compile-time profile=entryLatchedSs1Preserve. The shared I/O preflight banner above is superseded: exact-card checks and manual U can authorize one stock transaction.
+CHECK stage=secure-boot status=0
+CHECK stage=watchdog status=0
+PCI enumeration: status=0 handles=26
+PCI target matches=1 status=0
+target location: status=0
+config[00]=256010de 00100003 030000a1 00800010
+config[10]=5e000000 0000000c 00000040 0000000c
+config[20]=00000042 00005001 00000000 3ae817aa
+config[30]=fff80000 00000060 00000000 000001ff
+config[40]=3ae817aa 00000000 00000000 00000000
+config[50]=00000000 00000001 0023d6ce 00000000
+config[60]=48036801 00000008 00807805 00000000
+config[70]=00000000 00000000 0012b410 112c8de1
+config[80]=00092930 00454d04 10840140 00000000
+config[90]=00000000 00000000 00000000 00070813
+config[a0]=00000400 0180001e 001e0004 00000000
+config[b0]=00000000 01140009 00000000 00000000
+config[c0]=00000000 00000000 00050011 00b90000
+config[d0]=00ba0000 00000000 00000000 00000000
+config[e0]=00000000 00000000 00000000 00000000
+config[f0]=00000000 00000000 00000000 00000000
+target BDF=0:1:0.0 checks=1 pm=0x60 pcie=0x78 msi=0x68 msix=0
+CHECK stage=target status=0
+hybrid GOP enumeration: status=0 handles=2 target_console_allowed=1
+hybrid GOP[0] path=1 pci_id=0x256010de resolved=1 target=1 console=0 framebuffer=0x4000000000 bytes=26214400
+hybrid GOP[1] path=0 pci_id=0 resolved=0 target=0 console=1 framebuffer=0x4000000000 bytes=26214400
+hybrid GOP result: pathful=1 pathless=1 console=1 target_scanout=1 console_target=0 bad=0
+hybrid GOP: TARGET-CONSOLE MODE - the GPU that is about to be reset owns the panel.
+Expect the screen to go dark; every step is still written to REPORT.TXT.
+CHECK stage=display status=0
+bar0 query: status=0
+bar0 descriptor: type=0 granularity=32 min=0x5e000000 max=0xffffff length=0x1000000 translation=0
+CHECK stage=bar0 status=0
+live PROM hash matched=1
+CHECK stage=prom status=0
+cold state: chip=0xb76000a1 plm=0xffffff8f gfw=0x8b8f/0x3ff/0x10 WPR2_HI=0 SS0=0x13 SS1=0x7
+cold expected: profile=entryLatchedSs1Preserve chip=0xb76000a1 memory=0x1800 entry_latched=0 SS0=0 SS1=0 SS0target=0x88888888 SS1policy=preserve entry=0 target=0x8
+cold observed: profile=entryLatchedSs1Preserve chip=0xb76000a1 memory=0x1800 SS0=0x13 SS1=0x7
+entry selectors: latched_once=1 SS0=0x13 SS1=0x7 SS0target=0x88888888 SS1policy=preserve SS1target=0x8
+EXPERIMENTAL exact-card profile entryLatchedSs1Preserve verified; SS0target=0x88888888 SS1policy=preserve entry=0x7 target=0x8; hardware untested.
+CHECK stage=diagnostic-cold-state status=0
+ownership: records=19 exclusive=0 status=0x800000000000000f
+owner[0] protocol=fe47349a attributes=0x2 count=3 agent=0x3d135f18 controller=0x3d4e3f98
+owner[1] protocol=fe47349a attributes=0x2 count=6 agent=0x4297afc0 controller=0x3d4e3f98
+owner[2] protocol=3bc1b285 attributes=0x1 count=7 agent=0x41bdef98 controller=0
+owner[3] protocol=4006c0c1 attributes=0x1 count=1 agent=0x41bdef98 controller=0
+owner[4] protocol=4cf5b200 attributes=0x1 count=146 agent=0x41bdef98 controller=0
+owner[5] protocol=4cf5b200 attributes=0x10 count=1 agent=0x3d135f18 controller=0x3d4e3f98
+owner[6] protocol=4cf5b200 attributes=0x2 count=7 agent=0x3dc2e318 controller=0x3d4e3f98
+owner[7] protocol=4cf5b200 attributes=0x2 count=7 agent=0x3dc14b98 controller=0x3d4e3f98
+owner[8] protocol=4cf5b200 attributes=0x4 count=6 agent=0x3d415f98 controller=0x3d4e3f98
+owner[9] protocol=4cf5b200 attributes=0x2 count=6 agent=0x3dc2c898 controller=0x3d4e3f98
+owner[10] protocol=09576e91 attributes=0x1 count=299 agent=0x41bdef98 controller=0
+owner[11] protocol=09576e91 attributes=0x2 count=6 agent=0x3d135f18 controller=0x3d4e3f98
+owner[12] protocol=09576e91 attributes=0x8 count=1 agent=0x3d135f18 controller=0x3d0bfb18
+owner[13] protocol=09576e91 attributes=0x8 count=1 agent=0x3d135f18 controller=0x3d0bf818
+owner[14] protocol=09576e91 attributes=0x4 count=7 agent=0x3d372398 controller=0x3d4e3f98
+owner[15] protocol=09576e91 attributes=0x4 count=7 agent=0x3dc2e318 controller=0x3d4e3f98
+owner[16] protocol=09576e91 attributes=0x4 count=7 agent=0x3d49ca98 controller=0x3d4e3f98
+owner[17] protocol=09576e91 attributes=0x4 count=7 agent=0x3d390e18 controller=0x3d4e3f98
+owner[18] protocol=09576e91 attributes=0x4 count=7 agent=0x3d49e598 controller=0x3d4e3f98
+ownership: records=19 exclusive=0 status=0
+owner[0] protocol=fe47349a attributes=0x2 count=3 agent=0x3d135f18 controller=0x3d4e3f98
+owner[1] protocol=fe47349a attributes=0x2 count=6 agent=0x4297afc0 controller=0x3d4e3f98
+owner[2] protocol=3bc1b285 attributes=0x1 count=7 agent=0x41bdef98 controller=0
+owner[3] protocol=4006c0c1 attributes=0x1 count=1 agent=0x41bdef98 controller=0
+owner[4] protocol=4cf5b200 attributes=0x1 count=146 agent=0x41bdef98 controller=0
+owner[5] protocol=4cf5b200 attributes=0x10 count=1 agent=0x3d135f18 controller=0x3d4e3f98
+owner[6] protocol=4cf5b200 attributes=0x2 count=7 agent=0x3dc2e318 controller=0x3d4e3f98
+owner[7] protocol=4cf5b200 attributes=0x2 count=7 agent=0x3dc14b98 controller=0x3d4e3f98
+owner[8] protocol=4cf5b200 attributes=0x4 count=6 agent=0x3d415f98 controller=0x3d4e3f98
+owner[9] protocol=4cf5b200 attributes=0x2 count=6 agent=0x3dc2c898 controller=0x3d4e3f98
+owner[10] protocol=09576e91 attributes=0x1 count=299 agent=0x41bdef98 controller=0
+owner[11] protocol=09576e91 attributes=0x2 count=6 agent=0x3d135f18 controller=0x3d4e3f98
+owner[12] protocol=09576e91 attributes=0x8 count=1 agent=0x3d135f18 controller=0x3d0bfb18
+owner[13] protocol=09576e91 attributes=0x8 count=1 agent=0x3d135f18 controller=0x3d0bf818
+owner[14] protocol=09576e91 attributes=0x4 count=7 agent=0x3d372398 controller=0x3d4e3f98
+owner[15] protocol=09576e91 attributes=0x4 count=7 agent=0x3dc2e318 controller=0x3d4e3f98
+owner[16] protocol=09576e91 attributes=0x4 count=7 agent=0x3d49ca98 controller=0x3d4e3f98
+owner[17] protocol=09576e91 attributes=0x4 count=7 agent=0x3d390e18 controller=0x3d4e3f98
+owner[18] protocol=09576e91 attributes=0x4 count=7 agent=0x3d49e598 controller=0x3d4e3f98
+release refused: active child, different owner or unsupported open at record 12
+CHECK stage=ownership status=0x800000000000000f
+FINAL status=0x800000000000000f stage=ownership attempted=0 driver_release=0 clean=1

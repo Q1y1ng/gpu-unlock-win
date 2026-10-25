@@ -17,7 +17,7 @@ $bootPath    = '\EFI\WindowsGPUUnlock\UNLOCK-3060-MANUAL.EFI'
 $entryName   = 'GPU Unlock 3060 Laptop - EXPERIMENTAL (press U)'
 
 $efiSource = Join-Path $repo 'internal-boot\unlock\build\experimental\entryLatchedSs1Preserve\RTX3060-LAPTOP-EXPERIMENTAL-entryLatchedSs1Preserve.EFI'
-$efiSha    = 'FC49D006B7035BB399C80AE5446431C7D44992B21C3887C4B33E847FAE4A0A68'
+$efiSha    = 'A4BE680D0939BB76D92CEF4A06E1EBD346B5BA6290E672F24607447A6F98C439'
 $efiBytes  = 66560
 
 $assetSource = Join-Path $repo 'assets'
