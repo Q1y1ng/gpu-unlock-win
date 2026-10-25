@@ -1,0 +1,40 @@
+﻿**********************
+Windows PowerShell 脚本开始
+开始时间: 20261025221519
+用户名: LUO\s3431
+RunAs 用户: LUO\s3431
+配置名称: 
+计算机: LUO (Microsoft Windows NT 10.0.22631.0)
+主机应用程序: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -File E:\AI\gpu-unlock-win\scripts\rebuild-observe-elevated.ps1
+进程 ID: 12820
+PSVersion: 5.1.22621.5624
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.22621.5624
+BuildVersion: 10.0.22621.5624
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+capture dir exists: True
+write test ok: True
+Local profile configured. No disk layout, EFI files or boot settings changed.
+{"path": "DIAGNOSTIC.EFI", "bytes": 19968, "sha256": "148c086928bf2a5b039ada78e334f2d3f5954474c2f7c4cf700b7379a7c4d991", "machine": "AMD64", "subsystem": 10, "entry": "efi_main", "entry_rva": 4096, "imports": 0, "iat": 0, "delay_imports": 0, "nx": true, "dynamic_base": true}
+powershell.exe : Different observation EFI exists; preserve it before building a new profile
+所在位置 E:\AI\gpu-unlock-win\scripts\rebuild-observe-elevated.ps1:18 字符: 5
++     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-P ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Different obser...g a new profile:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+所在位置 E:\AI\gpu-unlock-win\Windows-GPU-UNLOCK\research\headless\build-observe.ps1:18 字符: 98
++ ... .EfiSha256){throw 'Different observation EFI exists; preserve it befo ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (Different obser...g a new profile:String) [], RuntimeException
+    + FullyQualifiedErrorId : Different observation EFI exists; preserve it before building a new profile
+build-observe exit: 1
+new OBSERVE.EFI sha256=7BF048F640689BC05849DA4DC2748DE792A273B47986E440E5EAFA0289A0E157
+**********************
+Windows PowerShell 脚本结束
+结束时间: 20261025221526
+**********************

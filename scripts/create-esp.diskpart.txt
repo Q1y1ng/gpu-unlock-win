@@ -1,0 +1,11 @@
+rem Create a dedicated 1 GiB EFI System Partition for the GPU unlock port.
+rem Disk 0 = CT1000P3SSD8 (internal NVMe, hosts E:). The Windows system disk (disk 1)
+rem and its own 300 MB ESP are deliberately left untouched.
+select disk 0
+select volume E
+shrink desired=1024 minimum=1024
+create partition efi size=1024
+format quick fs=fat32 label=GPUUNLOCK
+assign letter=S
+list partition
+list volume

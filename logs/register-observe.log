@@ -1,0 +1,61 @@
+﻿**********************
+Windows PowerShell 脚本开始
+开始时间: 20261025220006
+用户名: LUO\s3431
+RunAs 用户: LUO\s3431
+配置名称: 
+计算机: LUO (Microsoft Windows NT 10.0.22631.0)
+主机应用程序: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -File E:\AI\gpu-unlock-win\scripts\delete-orphan-and-register.ps1
+进程 ID: 5460
+PSVersion: 5.1.22621.5624
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.22621.5624
+BuildVersion: 10.0.22621.5624
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+observation entries found: 1
+
+
+Id   : {b05c3bb4-d07b-11f1-b16c-30894a35f1b9}
+Path : \EFI\Microsoft\Boot\bootmgfw.efi
+deleting exactly {b05c3bb4-d07b-11f1-b16c-30894a35f1b9}
+操作成功完成。
+delete exit: 0
+cleanup verified: 0 observation entries remain
+=== register ===
+Registered GPU Headless Observe - NO UNLOCK at the end of F8 menu. Default order prefix preserved; no BootNext/reboot/BIOS changes. Backup: C:\ProgramData\WindowsGPUUnlock\ResearchBackups\20261025-220011097
+register-observe exit: 0
+=== firmware displayorder after ===
+
+固件启动管理器
+---------------------
+标识符                  {fwbootmgr}
+displayorder            {bootmgr}
+                        {5c0d816f-4daa-11ef-a847-806e6f6e6963}
+                        {5c0d8170-4daa-11ef-a847-806e6f6e6963}
+                        {5c0d8171-4daa-11ef-a847-806e6f6e6963}
+                        {b05c3bb5-d07b-11f1-b16c-30894a35f1b9}
+timeout                 0
+=== observation entry after ===
+
+标识符                  {b05c3bb5-d07b-11f1-b16c-30894a35f1b9}
+device                  partition=S:
+path                    \EFI\WindowsGPUUnlock\OBSERVE.EFI
+description             GPU Headless Observe - NO UNLOCK
+locale                  zh-CN
+inherit                 {globalsettings}
+flightsigning           Yes
+default                 {current}
+resumeobject            {526cea73-4daa-11ef-9687-9f82a788fdbd}
+displayorder            {current}
+toolsdisplayorder       {memdiag}
+timeout                 30
+
+固件应用程序(101fffff)
+**********************
+Windows PowerShell 脚本结束
+结束时间: 20261025220013
+**********************

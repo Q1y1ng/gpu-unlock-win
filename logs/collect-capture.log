@@ -1,0 +1,158 @@
+﻿**********************
+Windows PowerShell 脚本开始
+开始时间: 20261025222801
+用户名: LUO\s3431
+RunAs 用户: LUO\s3431
+配置名称: 
+计算机: LUO (Microsoft Windows NT 10.0.22631.0)
+主机应用程序: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -File E:\AI\gpu-unlock-win\scripts\collect-capture.ps1
+进程 ID: 4132
+PSVersion: 5.1.22621.5624
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.22621.5624
+BuildVersion: 10.0.22621.5624
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+=== S:\ tree ===
+
+FullName                                       Length  LastWriteTime      
+--------                                       ------  -------------      
+S:\System Volume Information                           2026/10/25 21:50:34
+S:\EFI                                                 2026/10/25 21:55:06
+S:\RTX3090-UNLOCK                                      2026/10/25 22:26:52
+S:\BackupSbb.bin                               4317184 2026/10/25 22:08:46
+S:\System Volume Information\WPSettings.dat    12      2026/10/25 21:50:34
+S:\System Volume Information\IndexerVolumeGuid 76      2026/10/25 22:11:38
+S:\EFI\WindowsGPUUnlock                                2026/10/25 21:55:06
+S:\EFI\WindowsGPUUnlock\OBSERVE.EFI            19968   2026/10/25 22:25:44
+S:\RTX3090-UNLOCK\DIAG00.TXT                   506643  2026/10/25 22:20:20
+S:\RTX3090-UNLOCK\IMG00.BIN                    249216  2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG01.BIN                    69632   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG02.BIN                    81920   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG03.BIN                    45056   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG04.BIN                    18272   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG05.BIN                    150464  2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG06.BIN                    57344   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG07.BIN                    53248   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG08.BIN                    53248   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG09.BIN                    40960   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG10.BIN                    14496   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG11.BIN                    30080   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG12.BIN                    30080   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG13.BIN                    7808    2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG14.BIN                    28128   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG15.BIN                    17760   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG16.BIN                    9536    2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG17.BIN                    60704   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG18.BIN                    12576   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG19.BIN                    20128   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG20.BIN                    20384   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG21.BIN                    47392   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG22.BIN                    47392   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG23.BIN                    47392   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG24.BIN                    47392   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG25.BIN                    47392   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG26.BIN                    35872   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG27.BIN                    7776    2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG28.BIN                    11840   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG29.BIN                    12256   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG30.BIN                    12256   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG31.BIN                    12256   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG32.BIN                    17440   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG33.BIN                    10176   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG34.BIN                    13216   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG35.BIN                    7776    2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG36.BIN                    26400   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG37.BIN                    28192   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG38.BIN                    73408   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG39.BIN                    32960   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG40.BIN                    37088   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG41.BIN                    34720   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG42.BIN                    13088   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG43.BIN                    102784  2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG44.BIN                    32448   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG45.BIN                    36032   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG46.BIN                    36128   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG47.BIN                    67840   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG48.BIN                    67840   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG49.BIN                    5856    2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG50.BIN                    7776    2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG51.BIN                    3776    2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG52.BIN                    4320    2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG53.BIN                    16064   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG54.BIN                    13632   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG55.BIN                    139008  2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG56.BIN                    158432  2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\IMG57.BIN                    55488   2026/10/25 22:26:52
+S:\RTX3090-UNLOCK\DIAG01.TXT                   509296  2026/10/25 22:26:52
+=== copied to workspace ===
+
+FullName                                                Length
+--------                                                ------
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\DIAG00.TXT 506643
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\DIAG01.TXT 509296
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG00.BIN  249216
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG01.BIN   69632
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG02.BIN   81920
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG03.BIN   45056
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG04.BIN   18272
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG05.BIN  150464
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG06.BIN   57344
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG07.BIN   53248
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG08.BIN   53248
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG09.BIN   40960
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG10.BIN   14496
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG11.BIN   30080
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG12.BIN   30080
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG13.BIN    7808
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG14.BIN   28128
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG15.BIN   17760
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG16.BIN    9536
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG17.BIN   60704
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG18.BIN   12576
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG19.BIN   20128
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG20.BIN   20384
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG21.BIN   47392
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG22.BIN   47392
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG23.BIN   47392
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG24.BIN   47392
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG25.BIN   47392
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG26.BIN   35872
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG27.BIN    7776
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG28.BIN   11840
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG29.BIN   12256
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG30.BIN   12256
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG31.BIN   12256
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG32.BIN   17440
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG33.BIN   10176
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG34.BIN   13216
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG35.BIN    7776
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG36.BIN   26400
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG37.BIN   28192
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG38.BIN   73408
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG39.BIN   32960
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG40.BIN   37088
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG41.BIN   34720
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG42.BIN   13088
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG43.BIN  102784
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG44.BIN   32448
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG45.BIN   36032
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG46.BIN   36128
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG47.BIN   67840
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG48.BIN   67840
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG49.BIN    5856
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG50.BIN    7776
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG51.BIN    3776
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG52.BIN    4320
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG53.BIN   16064
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG54.BIN   13632
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG55.BIN  139008
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG56.BIN  158432
+E:\AI\gpu-unlock-win\captures\RTX3090-UNLOCK\IMG57.BIN   55488
+**********************
+Windows PowerShell 脚本结束
+结束时间: 20261025222801
+**********************

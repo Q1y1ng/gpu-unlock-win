@@ -1,0 +1,27 @@
+# 大体积、可再生成或第三方内容，不入库
+fw-build/
+refs/
+*.run
+*.run.part
+*.run.part.json
+*.pkg.tar.zst
+*.pkg.tar.zst.part
+*.pkg.tar.zst.part.json
+*.tar.xz
+**/assets/
+**/assets.src/
+**/.venv/
+**/__pycache__/
+*.bin
+*.BIN
+*.EFI
+*.efi
+
+# 例外：抓取证据（PROBE 的 DIAG 文本 + 驱动镜像转储）必须入库
+!captures/**
+
+
+# 上游 fork 自带独立 .git
+Windows-GPU-UNLOCK/
+rtx30-unlock/
+rtx3080-unlock-public/

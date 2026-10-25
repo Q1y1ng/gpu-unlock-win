@@ -1,0 +1,39 @@
+﻿**********************
+Windows PowerShell 脚本开始
+开始时间: 20261025215831
+用户名: LUO\s3431
+RunAs 用户: LUO\s3431
+配置名称: 
+计算机: LUO (Microsoft Windows NT 10.0.22631.0)
+主机应用程序: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -File E:\AI\gpu-unlock-win\scripts\find-observe-entry.ps1
+进程 ID: 13804
+PSVersion: 5.1.22621.5624
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.22621.5624
+BuildVersion: 10.0.22621.5624
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+MATCH_COUNT=1
+
+
+Id              : {b05c3bb3-d07b-11f1-b16c-30894a35f1b9}
+Device          : partition=\Device\HarddiskVolume3
+Path            : \EFI\Microsoft\Boot\bootmgfw.efi
+InFirmwareOrder : False
+=== firmware displayorder ===
+
+固件启动管理器
+---------------------
+标识符                  {fwbootmgr}
+displayorder            {bootmgr}
+                        {5c0d816f-4daa-11ef-a847-806e6f6e6963}
+                        {5c0d8170-4daa-11ef-a847-806e6f6e6963}
+                        {5c0d8171-4daa-11ef-a847-806e6f6e6963}
+timeout                 0
+**********************
+Windows PowerShell 脚本结束
+结束时间: 20261025215832
+**********************
