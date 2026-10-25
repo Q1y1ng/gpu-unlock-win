@@ -1,12 +1,12 @@
 ﻿**********************
 Windows PowerShell 脚本开始
-开始时间: 20261026001449
+开始时间: 20261026002614
 用户名: LUO\s3431
 RunAs 用户: LUO\s3431
 配置名称: 
 计算机: LUO (Microsoft Windows NT 10.0.22631.0)
 主机应用程序: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -File E:\AI\gpu-unlock-win\scripts\register-unlock.ps1 -ReplaceEfi
-进程 ID: 8852
+进程 ID: 2996
 PSVersion: 5.1.22621.5624
 PSEdition: Desktop
 PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.22621.5624
@@ -18,8 +18,8 @@ SerializationVersion: 1.1.0.1
 **********************
 target confirmed: S: guid={4c2a61ef-99fe-4a36-b797-e2b906058734} size=1073741824 fs=FAT32
 === stage files ===
-previous staged EFI kept as S:\EFI\WindowsGPUUnlock\UNLOCK-3060-MANUAL.EFI.prev-20261026-001452
-staged: S:\EFI\WindowsGPUUnlock\UNLOCK-3060-MANUAL.EFI 66560 bytes
+previous staged EFI kept as S:\EFI\WindowsGPUUnlock\UNLOCK-3060-MANUAL.EFI.prev-20261026-002617
+staged: S:\EFI\WindowsGPUUnlock\UNLOCK-3060-MANUAL.EFI 68096 bytes
 already staged: S:\RTX3090-UNLOCK\ASSETS\booter_load_ga102.bin
 already staged: S:\RTX3090-UNLOCK\ASSETS\v67-ga102-610.43.03.bin
 already staged: S:\RTX3090-UNLOCK\ASSETS\gsp_ga10x.bin
@@ -29,5 +29,5 @@ asset root: S:\RTX3090-UNLOCK\ASSETS
 Staging only; no boot entry changes.
 **********************
 Windows PowerShell 脚本结束
-结束时间: 20261026001452
+结束时间: 20261026002618
 **********************

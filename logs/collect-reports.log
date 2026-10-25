@@ -1,12 +1,12 @@
 ﻿**********************
 Windows PowerShell 脚本开始
-开始时间: 20261026001211
+开始时间: 20261026002237
 用户名: LUO\s3431
 RunAs 用户: LUO\s3431
 配置名称: 
 计算机: LUO (Microsoft Windows NT 10.0.22631.0)
 主机应用程序: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -File E:\AI\gpu-unlock-win\scripts\collect-reports.ps1
-进程 ID: 17348
+进程 ID: 18420
 PSVersion: 5.1.22621.5624
 PSEdition: Desktop
 PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.22621.5624
@@ -20,6 +20,8 @@ copied RUN00 -> E:\AI\gpu-unlock-win\captures\runs\RUN00.txt bytes=1683
   sha256=BFEBBE81083AB8734DF1CB48ACB3F82CE75507555700E2428097737795248CA4
 copied RUN01 -> E:\AI\gpu-unlock-win\captures\runs\RUN01.txt bytes=6391
   sha256=1D513EC4DC53B43859396F22F85731A5C390C305B41A2369BA5B19E094CEDCE6
+copied RUN02 -> E:\AI\gpu-unlock-win\captures\runs\RUN02.txt bytes=24087
+  sha256=E97994BEE8B39EF45E18FC51E32C1EC3076DBAFD0CFC327246D8E3BF8E3545B1
 
 === staged EFI ===
 
@@ -27,10 +29,11 @@ Name                                        Length LastWriteTime
 ----                                        ------ -------------      
 OBSERVE.EFI                                  19968 2026/10/25 22:25:44
 UNLOCK-3060-MANUAL.EFI.prev-20261026-000726  65536 2026/10/25 23:32:40
-UNLOCK-3060-MANUAL.EFI                       66560 2026/10/26 0:06:32
-staged sha256=FC49D006B7035BB399C80AE5446431C7D44992B21C3887C4B33E847FAE4A0A68
+UNLOCK-3060-MANUAL.EFI.prev-20261026-001452  66560 2026/10/26 0:06:32 
+UNLOCK-3060-MANUAL.EFI                       66560 2026/10/26 0:13:44
+staged sha256=A4BE680D0939BB76D92CEF4A06E1EBD346B5BA6290E672F24607447A6F98C439
 staged bytes=66560
 **********************
 Windows PowerShell 脚本结束
-结束时间: 20261026001211
+结束时间: 20261026002238
 **********************
