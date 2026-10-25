@@ -176,3 +176,60 @@
 - 我们自己写的 `.ps1` 一律**纯 ASCII**（5.1 按 ANSI 读无 BOM 文件，中文会把正则变无效）
 - 存储类 cmdlet 需要提权会话（本会话普通用户下 `拒绝访问`）
 - GitHub 直连被 TLS 层干扰，克隆走 `https://ghfast.top/https://github.com/...`
+
+## ✅ 最终结果（2026-10-26 00:37，RUN03）
+
+**解锁成功，且已实测。** 按键 U → 黑屏 → **19 秒进 Windows**（程序自己 `LoadImage`+`StartImage` bootmgfw）。
+
+RUN02 日志（`captures/runs/RUN02.txt`）已证明事务本身成功：
+
+```
+layout ranges: nonwpr=0x175300000 wpr=0x175400000 heap=0x175500000 gsp=0x17ada0000 boot=0x17fdfa000 frts=0x17fe00000
+FWSEC descriptor: offset=0x4128c header=0x4ac0301 image_off=0x41738 size=0xea00 ucode=9 signatures=3
+FWSEC result: scratch=0 expected_hi16=0   WPR2: low=0x17fe000 high=0x17fee00
+pre-FLR selectors: ss0=0x88888888 ss1=0x7
+PCIe FLR returned: result=0
+post-FLR ... SS0=88888888 SS1=00000007
+transaction result=0 containment=0 started=1 quiesced=1 fault=0 maps=0 FLR=1
+FINAL status=0 stage=transaction attempted=1 driver_release=1 clean=1
+```
+
+RUN02 卡在"交棒"：`FINAL status=0` 返回固件后 BDS 要重画菜单，显示驱动已被摘 → 黑屏挂死，用户断电，易失的 SS0 丢失。补 `-HandoffWindows` 后 RUN03 一次通过。
+
+### 性能对照（`E:\AI\gpu-unlock-bench\results\comparison.md`）
+
+| group | test | baseline | unlocked | 变化 |
+|---|---|---:|---:|---:|
+| target | gemm_fp16_8192 | 23.21 | 36.67 | **+58.0%** |
+| target | gemm_bf16_8192 | 23.23 | 38.85 | **+67.2%** |
+| target | gemm_tf32_8192 | 11.19 | 11.33 | +1.3% |
+| target | gemm_fp16_4096 | 21.26 | 37.63 | **+77.0%** |
+| target | gemm_bf16_4096 | 21.47 | 38.51 | **+79.4%** |
+| workload | mlp_prefill_bf16 | 21.97 | 37.55 | **+70.9%** |
+| control | gemm_fp32_simt | 6.01 | 6.12 | +1.8% |
+| control | gemm_fp16acc | 36.53 | 36.68 | +0.4% |
+| control | mem_copy_1GiB | 224.12 | 224.52 GB/s | +0.2% |
+
+FP16/BF16 大涨、TF32/FP32/带宽不动 —— 与 Zagitta 的机理描述一致（提高 FP16/BF16 指令发射率，不动带宽）。
+
+### LLM 侧（`results/llm_after.json`）
+
+| 用例 | pp512 | tg128 |
+|---|---:|---:|
+| ornith9b-ngl28 | **1058.4 t/s** | 26.8 t/s |
+| qwen35-4bvl-ngl99 | **1960.3 t/s** | 53.4 t/s |
+
+⚠️ 缺同口径 before（`-Label before` 需在未解锁状态跑一次），暂不能与 `D:\AI` 历史记录直接比（历史 Ornith-9B pp=891 t/s 用的是另一套 harness）。
+
+### 复现命令
+
+```powershell
+# 编译（本机独显模式必须带后两个开关）
+& internal-boot\unlock\build.ps1 -Clang <swift clang> -LldLink <swift lld-link> -Python <venv python> `
+    -ExperimentalUnlock -StockProfile entryLatchedSs1Preserve -HardwareProfile lenovo-82rf-3060 `
+    -AllowTargetConsole -HandoffWindows
+# 部署（提权）
+powershell -File scripts\register-unlock.ps1 -ReplaceEfi
+# 撤销启动项（提权）
+powershell -File scripts\register-unlock.ps1 -Rollback
+```
