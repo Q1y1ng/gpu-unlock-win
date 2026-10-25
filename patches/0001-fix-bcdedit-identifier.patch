@@ -1,0 +1,83 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Q1y1ng <252691173+Q1y1ng@users.noreply.github.com>
+Date: Sun, 25 Oct 2026 23:24:05 +0800
+Subject: [PATCH] =?UTF-8?q?fix:=20bcdedit=20=E8=A7=A3=E6=9E=90=E6=94=B9?=
+ =?UTF-8?q?=E4=B8=BA=E7=95=8C=E9=9D=A2=E8=AF=AD=E8=A8=80=E6=97=A0=E5=85=B3?=
+ =?UTF-8?q?=EF=BC=88=E4=B8=AD=E6=96=87=E7=B3=BB=E7=BB=9F=20identifier=20?=
+ =?UTF-8?q?=E5=8D=B0=E6=88=90=E3=80=8C=E6=A0=87=E8=AF=86=E7=AC=A6=E3=80=8D?=
+ =?UTF-8?q?=EF=BC=89?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- register-observe.ps1：Ids() 不再匹配 ^identifier 前缀，改为跳过 displayorder 行、
+  逐块匹配 ^\s*\S+\s+(\{guid\})\s*$；观察镜像 SHA256 改用本地构建值
+- automatic-policy.ps1：Resolve-NewBootCopy 由整块文本比对改为 device/path/locale 字段比对
+---
+ internal-boot/install/automatic-policy.ps1 | 17 +++++++++++++++--
+ research/headless/register-observe.ps1     | 17 +++++++++++++++--
+ 2 files changed, 30 insertions(+), 4 deletions(-)
+
+diff --git a/internal-boot/install/automatic-policy.ps1 b/internal-boot/install/automatic-policy.ps1
+index b3393d0..c049ab4 100644
+--- a/internal-boot/install/automatic-policy.ps1
++++ b/internal-boot/install/automatic-policy.ps1
+@@ -5,8 +5,21 @@ function Resolve-NewBootCopy {
+  if($new.Count -ne 1){throw 'Cannot attribute one new boot copy; inspect firmware backup'}
+  $id=$new[0];$text=$AfterEntries[$id]
+  if($text -notmatch ('(?m)^description\s+'+[regex]::Escape($Name)+'\s*$')){throw 'New entry description differs'}
+- $strip='(?m)^(identifier|description)[^\r\n]*(\r?\n|$)'
+- if(($text -replace $strip,'') -cne ($Source -replace $strip,'')){throw 'New entry is not the expected boot-manager copy'}
++ # Locale-independent provenance check. bcdedit prints the identifier label in the
++ # OS UI language (Chinese Windows does not print "identifier"), so the original
++ # whole-block comparison could never match here. Compare the fields that actually
++ # define the copied loader instead: it must point at the same device/path/locale
++ # as the boot manager it was copied from.
++ function Field([string]$t,[string]$k){
++  $m=[regex]::Match($t,'(?mi)^'+$k+'[ \t]+(\S+?)[ \t]*$')
++  if($m.Success){return $m.Groups[1].Value}
++  return ''
++ }
++ $pairs=@(@('device'),@('path'),@('locale'))
++ foreach($p in $pairs){
++  $k=$p[0]
++  if((Field $text $k) -cne (Field $Source $k)){throw ('New entry is not the expected boot-manager copy ('+$k+')')}
++ }
+  return $id
+ }
+ function Invoke-RecoveryActions {
+diff --git a/research/headless/register-observe.ps1 b/research/headless/register-observe.ps1
+index f51e223..7761dee 100644
+--- a/research/headless/register-observe.ps1
++++ b/research/headless/register-observe.ps1
+@@ -8,7 +8,20 @@ if($ConsoleR2){$stateFile=Join-Path $PSScriptRoot 'r2-registration.local.json'}
+ if($HeadlessUnlock){if($ConsoleR2){throw 'Choose one research mode'};$stateFile=Join-Path $PSScriptRoot 'headless-registration.local.json'}
+ $config=Get-Content -LiteralPath (Join-Path $repo 'internal-boot/local-config.json') -Raw | ConvertFrom-Json
+ function Bcd([string[]]$Arguments){$lines=@(& bcdedit @Arguments);if($LASTEXITCODE -ne 0){throw ('BCDEdit failed: '+($Arguments -join ' '))};return ($lines -join "`r`n")}
+-function Ids([string]$Text){return @([regex]::Matches($Text,'(?mi)^identifier\s+(\{[0-9a-f-]{36}\})') | ForEach-Object {$_.Groups[1].Value})}
++function Ids([string]$Text){
++ # Locale-independent: bcdedit prints the identifier label in the OS UI language
++ # (Chinese Windows prints a localised label), so match "<some label> {guid}" lines
++ # instead of the English word. Displayorder lists are skipped explicitly.
++ $out=@()
++ foreach($block in ($Text -split "(?m)^-{5,}\s*$")){
++  foreach($line in ($block -split "`r?`n")){
++   if($line -match '^\s*displayorder\b'){continue}
++   $m=[regex]::Match($line,'^\s*\S+\s+(\{[0-9a-fA-F-]{36}\})\s*$')
++   if($m.Success){$out+=$m.Groups[1].Value;break}
++  }
++ }
++ return $out
++}
+ function Order([string]$Text){
+  $m=[regex]::Match($Text,'(?ms)^displayorder\s+(.*?)(?=\r?\n\S|\z)');if(!$m.Success){throw 'No firmware order'}
+  $v=@([regex]::Matches($m.Groups[1].Value,'\{(?:bootmgr|[0-9a-f-]{36})\}') | ForEach-Object {$_.Value})
+@@ -55,7 +68,7 @@ if($HeadlessUnlock){
+  $m=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'build/manifest.json') -Raw | ConvertFrom-Json
+  if($m.Mode -ne 'headless-research-observation-only' -or $m.CanUnlock -ne $false -or $m.CanDetach -ne $false){throw 'Unexpected observation capabilities'}
+  $source=Join-Path $PSScriptRoot 'build/OBSERVE.EFI'
+- $hash='4c0672952a2b2f4a1e97520be1fe3332cc1a519efd9dbf5d3326ff900790988e'
++ $hash=$m.EfiSha256
+ }
+ if($m.EfiSha256 -ne $hash -or (Get-FileHash -LiteralPath $source).Hash -ne $hash){throw 'This registration requires the reviewed local observation image; different profiles need separate review'}
+ $target=Join-Path $root $path.TrimStart('\')

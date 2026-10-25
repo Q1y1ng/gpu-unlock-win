@@ -1,0 +1,281 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Q1y1ng <252691173+Q1y1ng@users.noreply.github.com>
+Date: Sun, 25 Oct 2026 23:24:05 +0800
+Subject: [PATCH] =?UTF-8?q?feat:=20=E6=96=B0=E5=A2=9E=20lenovo-82rf-3060?=
+ =?UTF-8?q?=20=E7=A1=AC=E4=BB=B6=20profile=20=E4=B8=8E=E6=B7=B7=E5=90=88?=
+ =?UTF-8?q?=E6=98=BE=E5=8D=A1=E6=98=BE=E7=A4=BA=E5=88=A4=E5=AE=9A?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- machine-profile.h：GU_PROFILE_LENOVO_82RF（10de:2560/17aa:3ae8、BAR0 0x5e000000、
+  chip 0xb76000a1、6 GiB、PROM sha256 3ea00dfb…）
+- app.c：DisplayCheck() 增加本机混合拓扑分支（iGPU 持有唯一带路径的 GOP、
+  控制台 GOP 无路径、无任何 GOP 解析到目标卡）；原 AMD 分支保持不动
+- build.ps1：-HardwareProfile 参数化 TargetPci/Subsystem/Chip/Prom/Memory 与产物名
+- Configure.ps1 / headless-package.ps1：白名单加入本机机型身份
+---
+ internal-boot/Configure.ps1                |  8 ++-
+ internal-boot/install/headless-package.ps1 |  3 +-
+ internal-boot/unlock/machine-profile.h     | 45 +++++++++++++-
+ unlock/app.c                               | 68 ++++++++++++++++++++++
+ unlock/build.ps1                           | 22 ++++---
+ 5 files changed, 133 insertions(+), 13 deletions(-)
+
+diff --git a/internal-boot/Configure.ps1 b/internal-boot/Configure.ps1
+index 5de8c16..06b0d2d 100644
+--- a/internal-boot/Configure.ps1
++++ b/internal-boot/Configure.ps1
+@@ -1,5 +1,5 @@
+ # GPL-2.0-only. Read-only disk inspection; writes only ignored local build config.
+-param([Parameter(Mandatory)][ValidatePattern('^[D-Zd-z]$')][string]$UnlockDriveLetter,[Parameter(Mandatory)][guid]$WindowsEspGuid,[ValidateSet('b650m-3090fe','b660m-3070ti')][string]$HardwareProfile='b650m-3090fe')
++param([Parameter(Mandatory)][ValidatePattern('^[D-Zd-z]$')][string]$UnlockDriveLetter,[Parameter(Mandatory)][guid]$WindowsEspGuid,[ValidateSet('b650m-3090fe','b660m-3070ti','lenovo-82rf-3060')][string]$HardwareProfile='b650m-3090fe')
+ $ErrorActionPreference='Stop'
+ $unlock=Get-Partition -DriveLetter $UnlockDriveLetter
+ $windows=@(Get-Partition | Where-Object {$_.Guid -and [guid]$_.Guid -eq $WindowsEspGuid})
+@@ -9,7 +9,11 @@ $wv=$windows[0] | Get-Volume
+ if($unlock.IsSystem -or [guid]$unlock.Guid -eq $WindowsEspGuid -or $unlock.GptType -ne '{c12a7328-f81f-11d2-ba4b-00a0c93ec93b}' -or $unlock.Size -lt 1GB -or $uv.FileSystem -ne 'FAT32' -or !$uv.Path -or !$wv.Path){throw 'Use a separate existing FAT32 EFI partition, at least 1 GiB; never the Windows ESP'}
+ if(!(Test-Path -LiteralPath (Join-Path $wv.Path 'EFI\Microsoft\Boot\bootmgfw.efi'))){throw 'Windows Boot Manager missing from selected ESP'}
+ . (Join-Path $PSScriptRoot 'install/headless-package.ps1')
+-$hwName=if($HardwareProfile -eq 'b660m-3070ti'){'ASUS-TUF-GAMING-B660M-E-D4-4003-RTX3070TI'}else{'ASUS-TUF-B650M-PLUS-WIFI-3057-RTX3090-FE'}
++$hwName=switch($HardwareProfile){
++ 'b660m-3070ti'{'ASUS-TUF-GAMING-B660M-E-D4-4003-RTX3070TI'}
++ 'lenovo-82rf-3060'{'LENOVO-82RF-J2CN51WW-RTX3060-LAPTOP'}
++ default{'ASUS-TUF-B650M-PLUS-WIFI-3057-RTX3090-FE'}
++}
+ $identity=Get-HeadlessProfileIdentity $hwName
+ $board=Get-CimInstance Win32_BaseBoard;$bios=Get-CimInstance Win32_BIOS
+ if($board.Product -ne $identity.Board -or $bios.SMBIOSBIOSVersion -ne $identity.Bios){throw ('This driver profile is restricted to '+$identity.Board+' BIOS '+$identity.Bios)}
+diff --git a/internal-boot/install/headless-package.ps1 b/internal-boot/install/headless-package.ps1
+index 9320013..37f7603 100644
+--- a/internal-boot/install/headless-package.ps1
++++ b/internal-boot/install/headless-package.ps1
+@@ -24,13 +24,14 @@ function Get-HeadlessProfileIdentity([string]$Profile){
+  switch($Profile){
+   'ASUS-TUF-B650M-PLUS-WIFI-3057-RTX3090-FE'{return @{Board='TUF GAMING B650M-PLUS WIFI';Bios='3057'}}
+   'ASUS-TUF-GAMING-B660M-E-D4-4003-RTX3070TI'{return @{Board='TUF GAMING B660M-E D4';Bios='4003'}}
++  'LENOVO-82RF-J2CN51WW-RTX3060-LAPTOP'{return @{Board='LNVNB161216';Bios='J2CN51WW'}}
+  }
+  throw ('Unknown hardware profile: '+$Profile)
+ }
+ function Assert-HeadlessPackage([string]$Repo){
+  $null=Assert-HeadlessLocalConfig $Repo
+  $m=Get-Content -LiteralPath (Join-Path $Repo 'internal-boot/boot/build/headless/manifest.json') -Raw | ConvertFrom-Json
+- if($m.Format -ne 2 -or $m.Mode -ne 'single-rtx-headless-unlock-then-windows' -or $m.CanUnlock -ne $true -or $m.RequiresHumanKey -ne $false -or $m.HardwareProfile -notin @('ASUS-TUF-B650M-PLUS-WIFI-3057-RTX3090-FE','ASUS-TUF-GAMING-B660M-E-D4-4003-RTX3070TI')){throw 'Unexpected headless package profile'}
++ if($m.Format -ne 2 -or $m.Mode -ne 'single-rtx-headless-unlock-then-windows' -or $m.CanUnlock -ne $true -or $m.RequiresHumanKey -ne $false -or $m.HardwareProfile -notin @('ASUS-TUF-B650M-PLUS-WIFI-3057-RTX3090-FE','ASUS-TUF-GAMING-B660M-E-D4-4003-RTX3070TI','LENOVO-82RF-J2CN51WW-RTX3060-LAPTOP')){throw 'Unexpected headless package profile'}
+  $actual=Get-HeadlessInputInventory $Repo -WithContract
+  if($actual.Count -ne $m.Inputs.Count){throw 'Build source set changed; rebuild the package'}
+  for($i=0;$i -lt $actual.Count;$i++){if($actual[$i].Path -cne $m.Inputs[$i].Path -or $actual[$i].Sha256 -ne $m.Inputs[$i].Sha256){throw ('Build input changed; rebuild: '+$actual[$i].Path)}}
+diff --git a/internal-boot/unlock/machine-profile.h b/internal-boot/unlock/machine-profile.h
+index bffa7a0..c87c213 100644
+--- a/internal-boot/unlock/machine-profile.h
++++ b/internal-boot/unlock/machine-profile.h
+@@ -10,11 +10,13 @@
+  */
+ #pragma once
+ 
+-#if defined(GU_PROFILE_B650M_3090FE) && defined(GU_PROFILE_B660M_3070TI)
++#if (defined(GU_PROFILE_B650M_3090FE) && defined(GU_PROFILE_B660M_3070TI)) || \
++    (defined(GU_PROFILE_B650M_3090FE) && defined(GU_PROFILE_LENOVO_82RF)) || \
++    (defined(GU_PROFILE_B660M_3070TI) && defined(GU_PROFILE_LENOVO_82RF))
+ #error Select exactly one machine profile
+ #endif
+-#if !defined(GU_PROFILE_B650M_3090FE) && !defined(GU_PROFILE_B660M_3070TI)
+-#define GU_PROFILE_B650M_3090FE 1
++#if !defined(GU_PROFILE_B650M_3090FE) && !defined(GU_PROFILE_B660M_3070TI) && !defined(GU_PROFILE_LENOVO_82RF)
++#define GU_PROFILE_LENOVO_82RF 1
+ #endif
+ 
+ /* 1 = the AMI combo splitter owns the console on top of the target GPU
+@@ -68,6 +70,43 @@
+ #define GU_NVGOP_TEXT_BYTES 0x20d33U
+ #define GU_NVGOP_TEXT_SHA256 "615b37a708b1894e18d7fa60cfcdacaa4d8b598863a10b8103d231a595847b2b"
+ 
++#elif defined(GU_PROFILE_LENOVO_82RF)
++
++/* LENOVO 82RF / Legion Y9000P IAH7H, BIOS J2CN51WW, Intel i9-12900H (UHD 770
++ * iGPU present) + RTX 3060 Laptop GPU (GA106M, 10de:2560). Hybrid laptop
++ * topology: neither upstream profile covers an Intel iGPU plus a discrete
++ * NVIDIA GPU, so the display/driver constants below are placeholders until
++ * the observation capture supplies them. Diagnostic builds only use
++ * GU_BOARD_ID (probe.c: GU_TARGET_VENDEV); never produce a write-enabled build
++ * from this profile before every placeholder is filled and reviewed. */
++#define GU_PROFILE_NAME "LENOVO-82RF-J2CN51WW-RTX3060-LAPTOP"
++#define GU_BOARD_ID 0x256010deU          /* 10de:2560 GA106M, confirmed via PnP */
++#define GU_BOARD_SUBSYSTEM 0x3ae817aaU   /* 17aa:3ae8 */
++#define GU_BAR0_BASE 0x5e000000ULL        /* DIAG01 probe-bar0 */
++#define GU_BAR0_END 0x5effffffULL         /* 16 MiB BAR0 */
++#define GU_DEVICE_MEMORY_SIZE 0x1800U    /* 6144 MiB (nvidia-smi + MMIO 0x1183a4) */
++#define GU_CHIP_ID 0xb76000a1U           /* DIAG01 MMIO[0] */
++#define GU_PROM_SHA256 "3ea00dfb0754ea1d2318106d6cfc583692c9e4afbc2783863c5ab9d24ae36cf3"
++#define GU_ROOT_PORT_DEVICE 1U
++#define GU_ROOT_PORT_FUNCTION 0U
++#define GU_RTX_PATH_BYTES \
++  2,1,12,0,0xd0,0x41,3,10,0,0,0,0,1,1,6,0,0,1,1,1,6,0,0,0,2,3,8,0,32,3,1,128,127,255,4,0
++#define GU_CONSOLE_TEXT_SIZE 0x0U
++#define GU_CONSOLE_TEXT_STOP 0x0U
++#define GU_CONSOLE_TEXT_VERSION 0x0U
++#define GU_CONSOLE_GFX_SIZE 0x0U
++#define GU_CONSOLE_GFX_STOP 0x0U
++#define GU_CONSOLE_GFX_VERSION 0x0U
++#define GU_EDID_IMAGE_SIZE 0x0U
++#define GU_EDID_STOP 0x0U
++#define GU_EDID_TEXT_BYTES 0x0U
++#define GU_EDID_TEXT_SHA256 "0000000000000000000000000000000000000000000000000000000000000000"
++#define GU_NVGOP_VERSION 0x0U
++#define GU_NVGOP_IMAGE_SIZE 0x0U
++#define GU_NVGOP_STOP 0x0U
++#define GU_NVGOP_TEXT_BYTES 0x0U
++#define GU_NVGOP_TEXT_SHA256 "0000000000000000000000000000000000000000000000000000000000000000"
++
+ #else
+ 
+ /* ASUSTeK TUF GAMING B650M-PLUS WIFI BIOS 3057, Ryzen (Raphael iGPU
+diff --git a/unlock/app.c b/unlock/app.c
+index ee75c63..e3ef7b8 100644
+--- a/unlock/app.c
++++ b/unlock/app.c
+@@ -54,6 +54,7 @@ static BOOLEAN ConsoleGopCheck(EFI_GRAPHICS_OUTPUT_PROTOCOL *Gop,UINTN Index,
+   }
+   return valid;
+ }
++#if !defined(GU_PROFILE_LENOVO_82RF)
+ static BOOLEAN AmdGopParent(EFI_DEVICE_PATH_PROTOCOL *Path) {
+   EFI_DEVICE_PATH_PROTOCOL *remaining=Path;EFI_HANDLE parent=NULL;
+   EFI_PCI_IO_PROTOCOL *pci=NULL;UINT32 id=0,subsystem=0;UINTN s,b,d,f;
+@@ -122,6 +123,73 @@ static BOOLEAN DisplayCheck(VOID) {
+   GuFree(handles);GuLog("GOP result: valid=%u amd_physical=%zu\n",valid,(size_t)intel);
+   return valid && intel==1 && GuLogReady();
+ }
++#endif /* !GU_PROFILE_LENOVO_82RF */
++
++#if defined(GU_PROFILE_LENOVO_82RF)
++/* Hybrid laptop topology (LENOVO 82RF: Intel iGPU + RTX 3060 Laptop).
++ *
++ * The observation capture (DIAG01.TXT, 2026-10-25) shows exactly two GOPs:
++ *   - one WITH a device path, whose PCI parent is not the target GPU (iGPU);
++ *   - one WITHOUT a device path, which is ConsoleOutHandle and reports no
++ *     framebuffer.
++ * No GOP resolves to the target GPU, and no nvgop DriverBinding exists, so the
++ * target owns no scanout. Releasing the target therefore cannot blank the
++ * console, which is the only property the upstream AMD-specific check needed.
++ *
++ * The check stays fail-closed: any GOP that resolves to the target device, a
++ * missing console GOP, more than one pathless GOP, or an enumeration larger
++ * than the upstream bound all reject the attempt.
++ */
++static BOOLEAN HybridGopIsTarget(EFI_DEVICE_PATH_PROTOCOL *Path) {
++  EFI_DEVICE_PATH_PROTOCOL *remaining=Path;EFI_HANDLE parent=NULL;
++  EFI_PCI_IO_PROTOCOL *pci=NULL;UINT32 id=0;
++  if(!Gu.bs->LocateDevicePath)return TRUE;              /* cannot prove -> treat as target */
++  EFI_STATUS status=Gu.bs->LocateDevicePath(&PciGuid,&remaining,&parent);
++  if(EFI_ERROR(status) || !parent)return TRUE;
++  status=Gu.bs->HandleProtocol(parent,&PciGuid,(VOID **)&pci);
++  if(EFI_ERROR(status) || !pci || !pci->Pci.Read)return TRUE;
++  status=pci->Pci.Read(pci,EfiPciIoWidthUint32,0,1,&id);
++  if(EFI_ERROR(status))return TRUE;
++  GuLog("hybrid GOP PCI parent id=%#x target=%#x\n",id,(unsigned)GU_BOARD_ID);
++  return id==GU_BOARD_ID;
++}
++static BOOLEAN DisplayCheck(VOID) {
++  EFI_HANDLE *handles=NULL;UINTN count=0,pathful=0,pathless=0;BOOLEAN valid=TRUE;
++  (void)GopInfoLog;(void)ConsoleGopCheck;   /* AMD-only helpers; keep -Werror quiet */
++  EFI_STATUS status=Gu.bs->LocateHandleBuffer(ByProtocol,&GopGuid,NULL,&count,&handles);
++  GuLog("hybrid GOP enumeration: status=%#llx handles=%zu\n",(unsigned long long)status,(size_t)count);
++  if(EFI_ERROR(status) || !handles || !count || count>16){if(handles)GuFree(handles);return FALSE;}
++  for(UINTN i=0;i<count;i++) {
++    EFI_GRAPHICS_OUTPUT_PROTOCOL *gop=NULL;EFI_DEVICE_PATH_PROTOCOL *path=NULL;
++    status=Gu.bs->HandleProtocol(handles[i],&GopGuid,(VOID **)&gop);
++    if(EFI_ERROR(status) || !gop) {
++      GuLog("hybrid GOP[%u] invalid protocol: status=%#llx\n",(unsigned)i,(unsigned long long)status);
++      valid=FALSE;break;
++    }
++    status=Gu.bs->HandleProtocol(handles[i],&PathGuid,(VOID **)&path);
++    if(EFI_ERROR(status) || !path) {
++      /* Pathless GOP: must be the system console and must not own a scanout. */
++      pathless++;
++      GuLog("hybrid GOP[%u] pathless console=%u framebuffer=%#llx bytes=%zu\n",(unsigned)i,
++        (unsigned)(handles[i]==Table->ConsoleOutHandle),
++        (unsigned long long)(gop->Mode?gop->Mode->FrameBufferBase:0),
++        (size_t)(gop->Mode?gop->Mode->FrameBufferSize:0));
++      if(handles[i]!=Table->ConsoleOutHandle || !gop->Mode || gop->Mode->FrameBufferBase) {
++        valid=FALSE;break;
++      }
++      continue;
++    }
++    if(HybridGopIsTarget(path)) {
++      GuLog("hybrid GOP[%u] belongs to the target GPU; release would blank it\n",(unsigned)i);
++      valid=FALSE;break;
++    }
++    pathful++;
++  }
++  if(handles)GuFree(handles);
++  GuLog("hybrid GOP result: valid=%u pathful=%zu pathless=%zu\n",valid,pathful,pathless);
++  return valid && pathful>=1 && pathless==1 && GuLogReady();
++}
++#endif /* GU_PROFILE_LENOVO_82RF */
+ static EFI_STATUS ReadConfig(UINT32 *Config) {
+   for(UINTN i=0;i<64;i++)if(EFI_ERROR(GuConfigRead(EfiPciIoWidthUint32,(UINT32)i*4,&Config[i]))) {
+     GuLog("PCI config read failed: offset=%#x valid_bytes=%u; snapshot incomplete\n",(unsigned)(i*4),(unsigned)(i*4));
+diff --git a/unlock/build.ps1 b/unlock/build.ps1
+index c25bcec..32bca35 100644
+--- a/unlock/build.ps1
++++ b/unlock/build.ps1
+@@ -4,16 +4,23 @@ param(
+  [string]$LldLink='lld-link',
+  [string]$Python='python',
+  [switch]$ExperimentalUnlock,
+- [ValidateSet('original03100062','observed03000062','entryLatchedSs1Preserve','entryLatchedSs1Full')][string]$StockProfile
++ [ValidateSet('original03100062','observed03000062','entryLatchedSs1Preserve','entryLatchedSs1Full')][string]$StockProfile,
++ [ValidateSet('b650m-3090fe','b660m-3070ti','lenovo-82rf-3060')][string]$HardwareProfile='b650m-3090fe'
+ )
+ $ErrorActionPreference='Stop'
++$profiles=@{
++ 'b650m-3090fe'=[ordered]@{Define='-DGU_PROFILE_B650M_3090FE';TargetPci='220410de';Subsystem='145410de';Chip='0xb72000a1';Prom='8ea297373e9e5d3600ff41ad9fae88f2d14c98c017d100669f7333981da673b4';Memory='0x6000';Name='RTX3090-EXPERIMENTAL'}
++ 'b660m-3070ti'=[ordered]@{Define='-DGU_PROFILE_B660M_3070TI';TargetPci='248210de';Subsystem='50521462';Chip='0xb74000a1';Prom='f429aa1d5f0f18d11ed9a19503683a674fe3541ae77e959df8e732652c2b4df0';Memory='0x2000';Name='RTX3070TI-EXPERIMENTAL'}
++ 'lenovo-82rf-3060'=[ordered]@{Define='-DGU_PROFILE_LENOVO_82RF';TargetPci='256010de';Subsystem='3ae817aa';Chip='0xb76000a1';Prom='3ea00dfb0754ea1d2318106d6cfc583692c9e4afbc2783863c5ab9d24ae36cf3';Memory='0x1800';Name='RTX3060-LAPTOP-EXPERIMENTAL'}
++}
++$prof=$profiles[$HardwareProfile]
+ Push-Location -LiteralPath $PSScriptRoot
+ try {
+  if(!(Test-Path -LiteralPath $PSScriptRoot)){throw 'Missing output parent'}
+  if($ExperimentalUnlock -and !$PSBoundParameters.ContainsKey('StockProfile')){throw '-StockProfile is required with -ExperimentalUnlock'}
+  if(!$ExperimentalUnlock -and $PSBoundParameters.ContainsKey('StockProfile')){throw '-StockProfile is only valid with -ExperimentalUnlock'}
+  $out=if($ExperimentalUnlock){"build/experimental/$StockProfile"}else{'build'}
+- $name=if($ExperimentalUnlock){"RTX3090-EXPERIMENTAL-$StockProfile"}else{'RTX3090-PREFLIGHT'}
++ $name=if($ExperimentalUnlock){"$($prof.Name)-$StockProfile"}else{'RTX3090-PREFLIGHT'}
+  $defines=@()
+   if($ExperimentalUnlock){$defines+= '-DGU_EXPERIMENTAL_3090';$defines+=$(switch($StockProfile){'original03100062'{'-DGU_STOCK_PROFILE_ORIGINAL_03100062'} 'observed03000062'{'-DGU_STOCK_PROFILE_OBSERVED_03000062'} 'entryLatchedSs1Preserve'{'-DGU_ENTRY_LATCHED_SS1_PRESERVE'} 'entryLatchedSs1Full'{'-DGU_ENTRY_LATCHED_SS1_FULL'}})}
+  New-Item -ItemType Directory -Path $out -Force | Out-Null
+@@ -22,25 +29,26 @@ try {
+  $objects=@()
+  foreach($source in $sources) {
+   $object="$out/"+($source -replace '/','_')+'.obj'
+-  & $Clang -target x86_64-pc-windows-msvc -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -mno-red-zone -fshort-wchar -Os -Wall -Wextra -Werror -Wno-unused-parameter -D__KERNEL__ -DGU_UEFI_PORT -DGU_TARGET_PCI_ID=0x220410deU @defines -I compat -I ../deps/edk2/MdePkg/Include -I ../deps/edk2/MdePkg/Include/X64 -c "$source.c" -o $object
++  & $Clang -target x86_64-pc-windows-msvc -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -mno-red-zone -fshort-wchar -Os -Wall -Wextra -Werror -Wno-unused-parameter -D__KERNEL__ -DGU_UEFI_PORT -DGU_TARGET_PCI_ID=0x$($prof.TargetPci)U $prof.Define @defines -I compat -I ../deps/edk2/MdePkg/Include -I ../deps/edk2/MdePkg/Include/X64 -c "$source.c" -o $object
+   if($LASTEXITCODE -ne 0){throw "Compile failed: $source"};$objects+=$object
+  }
+  & $LldLink /nologo /nodefaultlib /subsystem:efi_application /entry:efi_main /machine:x64 /base:0 /dynamicbase /nxcompat /timestamp:0 /opt:ref /opt:icf "/map:$out/$name.map" "/out:$out/$name.EFI" @objects
+  if($LASTEXITCODE -ne 0){throw 'EFI link failed'}
+  & $Python verify_pe.py "$out/$name.EFI" "$out/$name.map" --output "$out/pe-verification.json"
+  if($LASTEXITCODE -ne 0){throw 'PE verification failed'}
+- [ordered]@{BuiltUtc=[DateTime]::UtcNow.ToString('o');TargetPci='220410de';Subsystem='145410de';
++ [ordered]@{BuiltUtc=[DateTime]::UtcNow.ToString('o');TargetPci=$($prof.TargetPci);Subsystem=$($prof.Subsystem);HardwareProfile=$HardwareProfile;
+   Mode=$(if($ExperimentalUnlock){'experimental-exact-card-manual-unlock'}else{'diagnostic-preflight-only'});
+   CanArm=[bool]$ExperimentalUnlock;Defines=$defines;ManualConfirmation='U once; Esc or 30-second timeout cancels';
+-  StockProfile=$(if($ExperimentalUnlock){$StockProfile}else{$null});ColdChipExpected='0xb72000a1';ColdSS0Expected=$(if($StockProfile -like 'entryLatchedSs1*'){'first fully validated cold entry; immutable'}elseif($ExperimentalUnlock){if($StockProfile -eq 'original03100062'){'0x03100062'}else{'0x03000062'}}else{'unknown'});ColdSS1Expected=$(if($StockProfile -like 'entryLatchedSs1*'){'first fully validated cold entry <= 0xf; immutable'}else{'0x6'});
++  StockProfile=$(if($ExperimentalUnlock){$StockProfile}else{$null});ColdChipExpected=$($prof.Chip);ColdSS0Expected=$(if($StockProfile -like 'entryLatchedSs1*'){'first fully validated cold entry; immutable'}elseif($ExperimentalUnlock){if($StockProfile -eq 'original03100062'){'0x03100062'}else{'0x03000062'}}else{'unknown'});ColdSS1Expected=$(if($StockProfile -like 'entryLatchedSs1*'){'first fully validated cold entry <= 0xf; immutable'}else{'0x6'});
+   SS0Target='0x88888888';SS1Target=$(if($StockProfile -eq 'entryLatchedSs1Preserve'){'preserve entry; no SS1 writes'}elseif($StockProfile -eq 'entryLatchedSs1Full'){'0x8; one guarded write'}elseif($ExperimentalUnlock){'0x8'}else{'no writes'});
+   OriginalBaselineCapture='G:/RTX3090-PREFLIGHT/RUN00/REPORT.TXT';
+   StockProfileSource=$(if($StockProfile -like 'entryLatchedSs1*'){'Explicit immutable validated entry latch; no fixed stock selector assumption'}elseif($StockProfile -eq 'observed03000062'){'Explicit observed03000062 experiment selection; original baseline capture does not evidence this SS0'}elseif($ExperimentalUnlock){'OriginalBaselineCapture'}else{'preflight has no selected stock profile'});
+-  PromSha256='8ea297373e9e5d3600ff41ad9fae88f2d14c98c017d100669f7333981da673b4';
+-  DeviceMemorySize='0x6000';HardwareTested=$false;
++  PromSha256=$($prof.Prom);
++  DeviceMemorySize=$($prof.Memory);HardwareTested=$false;
+   EfiSha256=(Get-FileHash -LiteralPath "$out/$name.EFI" -Algorithm SHA256).Hash;
+   Headers=@(Get-ChildItem -LiteralPath . -Recurse -File -Filter '*.h' | Where-Object {$_.FullName -notlike '*\build\*'} | Sort-Object FullName | ForEach-Object {[ordered]@{Path=$_.FullName.Substring($PSScriptRoot.Length+1);Sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash}});
+   Sources=@($sources | ForEach-Object {[ordered]@{Path="$_.c";Sha256=(Get-FileHash -LiteralPath "$_.c" -Algorithm SHA256).Hash}})
+   } | ConvertTo-Json -Depth 5 | Set-Content -Encoding UTF8 -LiteralPath "$out/build-manifest.json"
+  "Built $name.EFI; ExperimentalUnlock=$([bool]$ExperimentalUnlock); hardware untested."
+ } finally {Pop-Location}
++

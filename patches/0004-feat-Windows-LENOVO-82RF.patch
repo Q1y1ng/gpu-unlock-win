@@ -1,0 +1,446 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Q1y1ng <252691173+Q1y1ng@users.noreply.github.com>
+Date: Mon, 26 Oct 2026 00:50:01 +0800
+Subject: [PATCH] =?UTF-8?q?feat:=20=E7=8B=AC=E6=98=BE=E7=9B=B4=E8=BF=9E?=
+ =?UTF-8?q?=E6=A8=A1=E5=BC=8F=E4=B8=8B=E6=94=AF=E6=8C=81=E8=A7=A3=E9=94=81?=
+ =?UTF-8?q?=E5=B9=B6=E4=BA=A4=E6=A3=92=20Windows=EF=BC=88LENOVO=2082RF?=
+ =?UTF-8?q?=EF=BC=89?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+本机是独显直连（dGPU-only）：nvidia-smi display_active=Enabled、核显 PnP
+Status=Unknown，固件显示 GOP 就挂在被复位的那张 3060 上。上游"控制台必须与
+目标卡隔离"的前提在此不成立，四轮实机尝试后补齐四处改动：
+
+1. app.c HybridDisplayCheck：改为数据驱动（逐条记录全部 GOP，不再看到第一个就
+   break），并新增 GU_ALLOW_TARGET_CONSOLE 分支——该模式下只记录不拦截。
+2. app_io.c GuConsole：该模式下控制台输出改为尽力而为，失败只置 ConsoleDead 并
+   继续写 REPORT.TXT，不再置 LogFault/Gu.fault（否则释放显示驱动后必然自杀）。
+3. app.c HandoffWindows：事务成功且资源全部释放后，按 GPT 分区 GUID
+   （boot/platform-config.h 的 Windows ESP）定位卷，把 END 节点换成 FILEPATH 节点，
+   LoadImage + StartImage 真正的 bootmgfw.efi。返回固件会让 BDS 重画菜单而显示
+   驱动已摘，实测黑屏挂死并丢失易失的解锁状态。
+4. ownership.c GuFindReleaseOwner：仅在该模式下接受"BY_CHILD_CONTROLLER 且
+   agent 正是唯一 PciIo owner"的子记录（目标卡挂着自己的 GOP 子控制器），
+   子句柄若本身是控制台句柄仍然拒绝。
+
+build.ps1：新增 -AllowTargetConsole / -HandoffWindows，清单记录
+TargetConsoleAllowed / WindowsHandoff / DisplayTopology。
+
+其它 profile、以及未开这两个开关的构建，行为完全相同。
+---
+ internal-boot/unlock/app.c       | 187 +++++++++++++++++++++++++++++++
+ internal-boot/unlock/app_io.c    |  39 ++++++-
+ internal-boot/unlock/build.ps1   |  24 +++-
+ internal-boot/unlock/ownership.c |  26 ++++-
+ 4 files changed, 266 insertions(+), 10 deletions(-)
+
+diff --git a/internal-boot/unlock/app.c b/internal-boot/unlock/app.c
+index aef52c2..7cfe22b 100644
+--- a/internal-boot/unlock/app.c
++++ b/internal-boot/unlock/app.c
+@@ -9,6 +9,10 @@
+ #include <Protocol/GraphicsOutput.h>
+ #include <IndustryStandard/Acpi.h>
+ #include <Guid/GlobalVariable.h>
++#if defined(GU_HANDOFF_WINDOWS)
++#include <Protocol/SimpleFileSystem.h>
++#include "../boot/media.h"   /* GuWindowsPartition + GuPathIsPartition */
++#endif
+ #ifdef GU_HEADLESS_RESEARCH
+ #include "headless-policy.h"
+ static BOOLEAN GuAppError(EFI_STATUS s){return s!=EFI_SUCCESS;}
+@@ -71,6 +75,7 @@ static BOOLEAN ConsoleGopCheck(EFI_GRAPHICS_OUTPUT_PROTOCOL *Gop,UINTN Index,
+   }
+   return valid;
+ }
++#if !defined(GU_PROFILE_LENOVO_82RF)
+ static BOOLEAN AmdGopParent(EFI_DEVICE_PATH_PROTOCOL *Path) {
+   EFI_DEVICE_PATH_PROTOCOL *remaining=Path;EFI_HANDLE parent=NULL;
+   EFI_PCI_IO_PROTOCOL *pci=NULL;UINT32 id=0,subsystem=0;UINTN s,b,d,f;
+@@ -86,10 +91,114 @@ static BOOLEAN AmdGopParent(EFI_DEVICE_PATH_PROTOCOL *Path) {
+   GuLog("AMD GOP PCI parent: status=%#llx id=%#x subsystem=%#x\n",(unsigned long long)status,id,subsystem);
+   return !EFI_ERROR(status) && id==GU_AMD_ID && subsystem==GU_AMD_SUBSYSTEM;
+ }
++#endif /* !GU_PROFILE_LENOVO_82RF */
++#if defined(GU_PROFILE_LENOVO_82RF)
++/* Hybrid-capable laptop topology (LENOVO 82RF: Intel Iris Xe iGPU + RTX 3060
++ * Laptop). This machine has a MUX, so the firmware display owner depends on
++ * the selected graphics mode:
++ *
++ *   Hybrid (iGPU drives the panel): the physical GOP is the iGPU's and the
++ *   target GPU owns no scanout -> releasing the target cannot blank anything.
++ *   Discrete (dGPU drives the panel): nvidia-smi reports display_active=Enabled
++ *   and the physical GOP resolves to the target GPU -> an FLR would blank the
++ *   console, so the attempt must be refused.
++ *
++ * The 2026-10-25 run proved the second case (PCI parent id 0x256010de) while
++ * the machine was in discrete-only mode, so the rule below is stated on the
++ * property that actually matters rather than on which GPU happens to be first:
++ * the target GPU must not be scanning out, and the console must not be served
++ * by the target GPU. Every GOP is logged before the decision, so a refusal
++ * still leaves a complete topology record in REPORT.TXT. */
++static BOOLEAN HybridGopParentId(EFI_DEVICE_PATH_PROTOCOL *Path,UINT32 *Id) {
++  EFI_DEVICE_PATH_PROTOCOL *remaining=Path;EFI_HANDLE parent=NULL;
++  EFI_PCI_IO_PROTOCOL *pci=NULL;UINT32 id=0;
++  if(!Gu.bs->LocateDevicePath)return FALSE;
++  EFI_STATUS status=Gu.bs->LocateDevicePath(&PciGuid,&remaining,&parent);
++  if(EFI_ERROR(status) || !parent)return FALSE;
++  status=Gu.bs->HandleProtocol(parent,&PciGuid,(VOID **)&pci);
++  if(EFI_ERROR(status) || !pci || !pci->Pci.Read)return FALSE;
++  status=pci->Pci.Read(pci,EfiPciIoWidthUint32,0,1,&id);
++  if(EFI_ERROR(status))return FALSE;
++  *Id=id;return TRUE;
++}
++static BOOLEAN HybridDisplayCheck(VOID) {
++  EFI_HANDLE *handles=NULL;UINTN count=0,pathful=0,pathless=0,console_gops=0,target_scanout=0;
++  BOOLEAN bad=FALSE,console_target=FALSE;
++  (void)GopInfoLog;(void)ConsoleGopCheck;   /* AMD-only helpers; keep -Werror quiet */
++  EFI_STATUS status=Gu.bs->LocateHandleBuffer(ByProtocol,&GopGuid,NULL,&count,&handles);
++  GuLog("hybrid GOP enumeration: status=%#llx handles=%zu target_console_allowed=%u\n",
++    (unsigned long long)status,(size_t)count,
++#if defined(GU_ALLOW_TARGET_CONSOLE)
++  1U
++#else
++  0U
++#endif
++  );
++#if defined(GU_ALLOW_TARGET_CONSOLE)
++  /* Discrete-graphics mode: the panel is driven by the target GPU itself, so the
++   * premise of this check does not hold. Record the topology and continue; the
++   * console is expected to be lost the moment its driver is released. */
++  if(EFI_ERROR(status) || count>16){if(handles)GuFree(handles);return FALSE;}
++  if(!handles || !count) {
++    GuLog("hybrid GOP: no GOP presents a display; accepting because target-console mode is explicit\n");
++    return GuLogReady();
++  }
++#else
++  if(EFI_ERROR(status) || !handles || !count || count>16){if(handles)GuFree(handles);return FALSE;}
++#endif
++  for(UINTN i=0;i<count;i++) {
++    EFI_GRAPHICS_OUTPUT_PROTOCOL *gop=NULL;EFI_DEVICE_PATH_PROTOCOL *path=NULL;
++    status=Gu.bs->HandleProtocol(handles[i],&GopGuid,(VOID **)&gop);
++    BOOLEAN is_console=(handles[i]==Table->ConsoleOutHandle);
++    if(EFI_ERROR(status) || !gop) {
++      /* Still classify the handle so the record stays complete. */
++      if(!path)pathless++;if(is_console)console_gops++;
++      GuLog("hybrid GOP[%u] invalid protocol: status=%#llx console=%u\n",(unsigned)i,
++        (unsigned long long)status,(unsigned)is_console);
++      bad=TRUE;continue;
++    }
++    UINT64 fb=gop->Mode?gop->Mode->FrameBufferBase:0;
++    UINTN  fbsize=gop->Mode?gop->Mode->FrameBufferSize:0;
++    status=Gu.bs->HandleProtocol(handles[i],&PathGuid,(VOID **)&path);
++    BOOLEAN has_path=!EFI_ERROR(status) && path;
++    UINT32 id=0;BOOLEAN resolved=FALSE,owned=FALSE;
++    if(has_path) {
++      pathful++;
++      resolved=HybridGopParentId(path,&id);
++      /* A pathful GOP we cannot attribute is treated as target-owned. */
++      owned=resolved?(id==GU_BOARD_ID):TRUE;
++    } else {
++      pathless++;
++    }
++    GuLog("hybrid GOP[%u] path=%u pci_id=%#x resolved=%u target=%u console=%u framebuffer=%#llx bytes=%zu\n",
++      (unsigned)i,(unsigned)has_path,id,(unsigned)resolved,(unsigned)owned,(unsigned)is_console,
++      (unsigned long long)fb,(size_t)fbsize);
++    if(is_console)console_gops++;
++    if(owned && fb)target_scanout++;
++    if(owned && is_console)console_target=TRUE;
++    if(!has_path && !is_console)bad=TRUE;   /* a pathless GOP must be the console's */
++  }
++  if(handles)GuFree(handles);
++  GuLog("hybrid GOP result: pathful=%zu pathless=%zu console=%zu target_scanout=%zu console_target=%u bad=%u\n",
++    pathful,pathless,console_gops,target_scanout,(unsigned)console_target,(unsigned)bad);
++#if defined(GU_ALLOW_TARGET_CONSOLE)
++  if(console_target || target_scanout)
++    GuLog("hybrid GOP: TARGET-CONSOLE MODE - the GPU that is about to be reset owns the panel.\n"
++          "Expect the screen to go dark; every step is still written to REPORT.TXT.\n");
++  return GuLogReady();
++#else
++  if(console_target)GuLog("hybrid GOP refuses: the console is served by the target GPU; select Hybrid graphics mode\n");
++  else if(target_scanout)GuLog("hybrid GOP refuses: the target GPU is scanning out %zu framebuffer(s); select Hybrid graphics mode\n",target_scanout);
++  return !bad && !console_target && target_scanout==0 && console_gops>=1 && pathful>=1 && GuLogReady();
++#endif
++}
++#endif /* GU_PROFILE_LENOVO_82RF */
+ #endif
+ static BOOLEAN DisplayCheck(VOID) {
+ #ifdef GU_HEADLESS_RESEARCH
+   return GuHeadlessCheck() && GuLogReady();
++#elif defined(GU_PROFILE_LENOVO_82RF)
++  return HybridDisplayCheck();
+ #else
+   EFI_HANDLE *handles=NULL;UINTN count=0,intel=0;BOOLEAN valid=TRUE;
+   EFI_GRAPHICS_OUTPUT_MODE_INFORMATION physical={0},forwarded={0};BOOLEAN forwarding=FALSE;
+@@ -412,6 +521,70 @@ static VOID ReleaseHalt(EFI_STATUS Status,BOOLEAN Attempted) {
+     (unsigned long long)Status,Stage,Attempted,(unsigned long long)contained,(unsigned)(Gu.pci!=NULL));
+   Halt();
+ }
++#if defined(GU_HANDOFF_WINDOWS)
++/* Load and start the real Windows Boot Manager from the Windows ESP.
++ *
++ * The ESP is identified by the GPT partition GUID recorded in
++ * boot/platform-config.h (never by drive letter or by "the only ESP on the
++ * machine"), so this cannot wander onto the dedicated unlock partition or any
++ * other volume. The firmware-provided device path of that volume has its
++ * END_ENTIRE node replaced by a FILEPATH node, which is what LoadImage needs.
++ * This runs only after a successful transaction and after every resource of
++ * this application has been released. */
++static EFI_STATUS HandoffWindows(VOID) {
++  static EFI_GUID PathGuid=EFI_DEVICE_PATH_PROTOCOL_GUID,FsGuid=EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID;
++  static const CHAR16 Name[]=L"\\EFI\\Microsoft\\Boot\\bootmgfw.efi";
++  EFI_HANDLE *handles=NULL;UINTN count=0,esp_count=0;EFI_HANDLE esp=NULL;
++  EFI_STATUS status=Gu.bs->LocateHandleBuffer(ByProtocol,&FsGuid,NULL,&count,&handles);
++  if(EFI_ERROR(status) || !handles || !count || count>64){if(handles)GuFree(handles);
++    GuLog("handoff: no filesystems\n");return EFI_NOT_FOUND;}
++  for(UINTN i=0;i<count;i++) {
++    EFI_DEVICE_PATH_PROTOCOL *dp=NULL;
++    if(EFI_ERROR(Gu.bs->HandleProtocol(handles[i],&PathGuid,(VOID **)&dp)) || !dp)continue;
++    if(GuPathIsPartition(dp,&GuWindowsPartition)){esp=handles[i];esp_count++;}
++  }
++  GuFree(handles);
++  GuLog("handoff: windows ESP matches=%zu\n",esp_count);
++  if(esp_count!=1 || !esp){GuLog("handoff: refusing, expected exactly one Windows ESP\n");return EFI_NOT_FOUND;}
++  EFI_DEVICE_PATH_PROTOCOL *base=NULL;
++  status=Gu.bs->HandleProtocol(esp,&PathGuid,(VOID **)&base);
++  if(EFI_ERROR(status) || !base)return status;
++  /* Locate the END_ENTIRE node of the volume path. */
++  UINTN prefix=0;const EFI_DEVICE_PATH_PROTOCOL *node=base;
++  for(UINTN n=0;n<64;n++) {
++    UINTN len=node->Length[0]+((UINTN)node->Length[1]<<8);
++    if(len<4)return EFI_DEVICE_ERROR;
++    if(node->Type==END_DEVICE_PATH_TYPE && node->SubType==END_ENTIRE_DEVICE_PATH_SUBTYPE) {
++      prefix=(UINTN)((const UINT8 *)node-(const UINT8 *)base);break;
++    }
++    node=(const VOID *)((const UINT8 *)node+len);
++  }
++  if(!prefix){GuLog("handoff: volume path has no end node\n");return EFI_DEVICE_ERROR;}
++  UINTN nameBytes=sizeof(Name);                        /* includes the terminator */
++  UINTN fileSize=(4U+nameBytes+3U)&~(UINTN)3U;
++  UINTN total=prefix+fileSize+4U;
++  EFI_DEVICE_PATH_PROTOCOL *full=GuAlloc(total);
++  if(!full)return EFI_OUT_OF_RESOURCES;
++  memcpy(full,base,prefix);
++  FILEPATH_DEVICE_PATH *file=(FILEPATH_DEVICE_PATH *)((UINT8 *)full+prefix);
++  file->Header.Type=MEDIA_DEVICE_PATH;file->Header.SubType=MEDIA_FILEPATH_DP;
++  file->Header.Length[0]=(UINT8)(fileSize&0xff);file->Header.Length[1]=(UINT8)(fileSize>>8);
++  memset(file->PathName,0,fileSize-4);
++  memcpy(file->PathName,Name,nameBytes);
++  EFI_DEVICE_PATH_PROTOCOL *end=(EFI_DEVICE_PATH_PROTOCOL *)((UINT8 *)full+prefix+fileSize);
++  end->Type=END_DEVICE_PATH_TYPE;end->SubType=END_ENTIRE_DEVICE_PATH_SUBTYPE;
++  end->Length[0]=4;end->Length[1]=0;
++  EFI_HANDLE child=NULL;UINTN exitDataSize=0;CHAR16 *exitData=NULL;
++  status=Gu.bs->LoadImage(FALSE,Gu.image,full,NULL,0,&child);
++  GuFree(full);
++  GuLog("handoff: LoadImage status=%#llx image=%#llx\n",(unsigned long long)status,(unsigned long long)(UINTN)child);
++  if(EFI_ERROR(status))return status;
++  status=Gu.bs->StartImage(child,&exitDataSize,&exitData);
++  GuLog("handoff: StartImage returned status=%#llx exit_data=%zu\n",(unsigned long long)status,(size_t)exitDataSize);
++  if(exitData)GuFree(exitData);
++  return status;
++}
++#endif
+ EFI_STATUS EFIAPI efi_main(EFI_HANDLE Image,EFI_SYSTEM_TABLE *St) {
+   if(!St || !St->BootServices || !St->RuntimeServices)return EFI_INVALID_PARAMETER;
+   Table=St;GuInit(St->BootServices,NULL);Gu.image=Image;Gu.display_check=DisplayCheck;
+@@ -528,5 +701,19 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE Image,EFI_SYSTEM_TABLE *St) {
+   GuReleaseAssets();
+   if(!EFI_ERROR(status))GuConsole("UEFI transaction completed and cleaned up. Returning to firmware; Windows validation is pending.\n");
+   else GuConsole("Attempt cancelled or rejected. Returning without another attempt.\n");
++#if defined(GU_HANDOFF_WINDOWS)
++  /* Hand the completed transaction straight to the real Windows Boot Manager.
++   * Returning to firmware is NOT safe in this topology: the firmware boot
++   * manager may try to redraw its menu through the display driver we just
++   * disconnected, and the machine then hangs on a black screen with the unlock
++   * already applied but never used. Loading bootmgfw.efi ourselves skips that.
++   * Only a successful transaction is handed off; every failure path still
++   * returns to firmware so the operator sees the decision. */
++  if(!EFI_ERROR(status)) {
++    EFI_STATUS handoff=HandoffWindows();
++    GuLog("windows handoff: status=%#llx\n",(unsigned long long)handoff);
++    if(EFI_ERROR(handoff))status=handoff;
++  }
++#endif
+   return status;
+ }
+diff --git a/internal-boot/unlock/app_io.c b/internal-boot/unlock/app_io.c
+index b197e34..6745169 100644
+--- a/internal-boot/unlock/app_io.c
++++ b/internal-boot/unlock/app_io.c
+@@ -5,7 +5,7 @@
+ #include <Protocol/LoadedImage.h>
+ #include <Protocol/SimpleFileSystem.h>
+ #include <Guid/FileInfo.h>
+-#if defined(GU_INTERNAL_BOOT)
++#if defined(GU_INTERNAL_BOOT) || defined(GU_PROFILE_LENOVO_82RF)
+ #include "../boot/media.h"
+ #endif
+ static EFI_GUID LoadedGuid=EFI_LOADED_IMAGE_PROTOCOL_GUID,PathGuid=EFI_DEVICE_PATH_PROTOCOL_GUID,
+@@ -28,15 +28,36 @@ static const ASSET_SPEC Specs[]={
+  {"gpu-unlock/610.43.03/gsp_boot_desc_ga102.bin",L"ASSETS\\gsp_boot_desc_ga102.bin",84,"cc5a3fc1f4c47f2fe107b1b68f0176d8a448e6dec84b575e5560ccef5262bf15"}
+ };
+ static VOID LogError(VOID){LogFault=TRUE;if(Gu.armed)Gu.fault=TRUE;}
++#if !defined(GU_HEADLESS_RESEARCH)
++/* Discrete-graphics mode: the panel is driven by the GPU this application
++ * releases and resets, so losing the text console is the expected outcome, not
++ * a fault. In that mode console output is best effort and never poisons
++ * Gu.fault / LogFault; the report file remains the authoritative record. */
++static BOOLEAN ConsoleDead;
++#endif
+ VOID GuConsole(const char *Text) {
+ #ifdef GU_HEADLESS_RESEARCH
+   (void)Text; /* No console calls, including failure and overflow paths. */
+ #else
+-  if(!Table || !Table->ConOut || !Table->ConOut->OutputString){LogError();return;}
++  if(ConsoleDead)return;
++  if(!Table || !Table->ConOut || !Table->ConOut->OutputString){
++#if defined(GU_ALLOW_TARGET_CONSOLE)
++    ConsoleDead=TRUE;return;
++#else
++    LogError();return;
++#endif
++  }
+   while(*Text) {
+     CHAR16 line[128];UINTN n=0;
+     while(*Text && n<126){if(*Text=='\n')line[n++]='\r';line[n++]=(UINT8)*Text++;}
+-    line[n]=0;if(EFI_ERROR(Table->ConOut->OutputString(Table->ConOut,line))){LogError();return;}
++    line[n]=0;
++    if(EFI_ERROR(Table->ConOut->OutputString(Table->ConOut,line))){
++#if defined(GU_ALLOW_TARGET_CONSOLE)
++      ConsoleDead=TRUE;return;
++#else
++      LogError();return;
++#endif
++    }
+   }
+ #endif
+ }
+@@ -63,6 +84,18 @@ static BOOLEAN UsbPath(EFI_HANDLE Handle) {
+   return GuPathIsPartition(path,&GuInternalPartition);
+ #elif defined(GU_INTERNAL_BOOT)
+   return GuAllowedMediaPath(path,TRUE);
++#elif defined(GU_PROFILE_LENOVO_82RF)
++  /* The upstream manual build only runs from a USB stick (it requires an MSG_USB
++   * device-path node). This machine has no spare FAT32 stick, so the manual
++   * experiment runs from the dedicated 1 GiB FAT32 ESP on the data disk that
++   * Configure.ps1 created and recorded in boot/platform-config.h.
++   *
++   * GuAllowedMediaPath() is the upstream internal-boot media policy: it requires
++   * exactly one GPT HARDDRIVE node whose 16-byte partition signature equals the
++   * configured dedicated partition GUID, and accepts either that partition or a
++   * USB path. The Windows ESP GUID is a different value and is therefore still
++   * rejected, as is every other partition on this machine. */
++  return GuAllowedMediaPath(path,TRUE);
+ #else
+   UINTN total=0;BOOLEAN usb=FALSE;
+   for(UINTN nodes=0;nodes<64 && total+4<=4096;nodes++) {
+diff --git a/internal-boot/unlock/build.ps1 b/internal-boot/unlock/build.ps1
+index ac23763..1434904 100644
+--- a/internal-boot/unlock/build.ps1
++++ b/internal-boot/unlock/build.ps1
+@@ -7,15 +7,18 @@ param(
+  [switch]$InternalBoot,
+  [switch]$AutomaticBoot,
+  [switch]$HeadlessResearch,
++ [switch]$AllowTargetConsole,
++ [switch]$HandoffWindows,
+  [ValidateSet('original03100062','observed03000062','entryLatchedSs1Preserve','entryLatchedSs1Full')][string]$StockProfile,
+- [ValidateSet('b650m-3090fe','b660m-3070ti')][string]$HardwareProfile='b650m-3090fe'
++ [ValidateSet('b650m-3090fe','b660m-3070ti','lenovo-82rf-3060')][string]$HardwareProfile='b650m-3090fe'
+ )
+ # Reviewed single-machine profiles; mirrors internal-boot/unlock/machine-profile.h.
+ # A profile is fixed provenance: it selects constants compiled into the EFI,
+ # never a user-editable switch.
+ $hwTable=@{
+- 'b650m-3090fe'=[ordered]@{Define='-DGU_PROFILE_B650M_3090FE';Name='ASUS-TUF-B650M-PLUS-WIFI-3057-RTX3090-FE';TargetPci='220410de';Subsystem='145410de';Chip='0xb72000a1';Prom='8ea297373e9e5d3600ff41ad9fae88f2d14c98c017d100669f7333981da673b4';Memory='0x6000';HeadlessOnly=$false}
+- 'b660m-3070ti'=[ordered]@{Define='-DGU_PROFILE_B660M_3070TI';Name='ASUS-TUF-GAMING-B660M-E-D4-4003-RTX3070TI';TargetPci='248210de';Subsystem='50521462';Chip='0xb74000a1';Prom='f429aa1d5f0f18d11ed9a19503683a674fe3541ae77e959df8e732652c2b4df0';Memory='0x2000';HeadlessOnly=$true}
++ 'b650m-3090fe'=[ordered]@{Define='-DGU_PROFILE_B650M_3090FE';Name='ASUS-TUF-B650M-PLUS-WIFI-3057-RTX3090-FE';ShortName='RTX3090';TargetPci='220410de';Subsystem='145410de';Chip='0xb72000a1';Prom='8ea297373e9e5d3600ff41ad9fae88f2d14c98c017d100669f7333981da673b4';Memory='0x6000';HeadlessOnly=$false}
++ 'b660m-3070ti'=[ordered]@{Define='-DGU_PROFILE_B660M_3070TI';Name='ASUS-TUF-GAMING-B660M-E-D4-4003-RTX3070TI';ShortName='RTX3090';TargetPci='248210de';Subsystem='50521462';Chip='0xb74000a1';Prom='f429aa1d5f0f18d11ed9a19503683a674fe3541ae77e959df8e732652c2b4df0';Memory='0x2000';HeadlessOnly=$true}
++ 'lenovo-82rf-3060'=[ordered]@{Define='-DGU_PROFILE_LENOVO_82RF';Name='LENOVO-82RF-J2CN51WW-RTX3060-LAPTOP';ShortName='RTX3060-LAPTOP';TargetPci='256010de';Subsystem='3ae817aa';Chip='0xb76000a1';Prom='3ea00dfb0754ea1d2318106d6cfc583692c9e4afbc2783863c5ab9d24ae36cf3';Memory='0x1800';HeadlessOnly=$false}
+ }
+ $hw=$hwTable[$HardwareProfile]
+ $ErrorActionPreference='Stop'
+@@ -25,8 +28,20 @@ try {
+  if($ExperimentalUnlock -and !$PSBoundParameters.ContainsKey('StockProfile')){throw '-StockProfile is required with -ExperimentalUnlock'}
+  if(!$ExperimentalUnlock -and $PSBoundParameters.ContainsKey('StockProfile')){throw '-StockProfile is only valid with -ExperimentalUnlock'}
+  $out=if($ExperimentalUnlock){"build/experimental/$StockProfile"}else{'build'}
+- $name=if($ExperimentalUnlock){"RTX3090-EXPERIMENTAL-$StockProfile"}else{'RTX3090-PREFLIGHT'}
++ $name=if($ExperimentalUnlock){"$($hw.ShortName)-EXPERIMENTAL-$StockProfile"}else{"$($hw.ShortName)-PREFLIGHT"}
+  $defines=@()
++ if($AllowTargetConsole) {
++  # Only this laptop profile has the discrete-graphics console topology documented.
++  if($HardwareProfile -ne 'lenovo-82rf-3060'){throw 'Target-console mode is only defined for the discrete-graphics laptop profile'}
++  if(!$ExperimentalUnlock){throw 'Target-console mode requires -ExperimentalUnlock'}
++  $defines+='-DGU_ALLOW_TARGET_CONSOLE'
++ }
++ if($HandoffWindows) {
++  # Same topology: returning to firmware after a successful transaction can hang
++  # on the disconnected display driver, so the app must start Windows itself.
++  if(!$AllowTargetConsole){throw 'Windows handoff requires -AllowTargetConsole'}
++  $defines+='-DGU_HANDOFF_WINDOWS'
++ }
+  if($HeadlessResearch -and (!$AutomaticBoot -or !$InternalBoot -or !$ExperimentalUnlock -or $StockProfile -ne 'entryLatchedSs1Full')){throw 'Headless research requires automatic internal exact full profile'}
+  if($hw.HeadlessOnly -and $ExperimentalUnlock -and !$HeadlessResearch){throw ('Profile '+$HardwareProfile+' only ships a headless write path; non-headless builds are diagnostic-only')}
+  if($AutomaticBoot -and (!$InternalBoot -or !$ExperimentalUnlock -or $StockProfile -ne 'entryLatchedSs1Full')){throw 'Automatic boot requires internal full experimental profile'}
+@@ -53,6 +68,7 @@ try {
+  [ordered]@{BuiltUtc=[DateTime]::UtcNow.ToString('o');HardwareProfile=$hw.Name;TargetPci=$hw.TargetPci;Subsystem=$hw.Subsystem;
+   Mode=$(if($HeadlessResearch){'headless-research-automatic-internal-exact-card-unlock'}elseif($AutomaticBoot){'automatic-internal-exact-card-unlock'}elseif($ExperimentalUnlock){'experimental-exact-card-manual-unlock'}else{'diagnostic-preflight-only'});
+   CanArm=[bool]$ExperimentalUnlock;Defines=$defines;ManualConfirmation=$(if($AutomaticBoot){'none; Esc within 3 seconds cancels'}else{'U once; Esc or 30-second timeout cancels'});
++  TargetConsoleAllowed=[bool]$AllowTargetConsole;WindowsHandoff=[bool]$HandoffWindows;DisplayTopology=$(if($AllowTargetConsole){'discrete: target GPU owns the panel; console loss expected'}else{'console independent of target GPU'});
+   StockProfile=$(if($ExperimentalUnlock){$StockProfile}else{$null});ColdChipExpected=$hw.Chip;ColdSS0Expected=$(if($StockProfile -like 'entryLatchedSs1*'){'first fully validated cold entry; immutable'}elseif($ExperimentalUnlock){if($StockProfile -eq 'original03100062'){'0x03100062'}else{'0x03000062'}}else{'unknown'});ColdSS1Expected=$(if($StockProfile -like 'entryLatchedSs1*'){'first fully validated cold entry <= 0xf; immutable'}else{'0x6'});
+   SS0Target='0x88888888';SS1Target=$(if($StockProfile -eq 'entryLatchedSs1Preserve'){'preserve entry; no SS1 writes'}elseif($StockProfile -eq 'entryLatchedSs1Full'){'0x8; one guarded write'}elseif($ExperimentalUnlock){'0x8'}else{'no writes'});
+   OriginalBaselineCapture='G:/RTX3090-PREFLIGHT/RUN00/REPORT.TXT';
+diff --git a/internal-boot/unlock/ownership.c b/internal-boot/unlock/ownership.c
+index 19a8f92..3188856 100644
+--- a/internal-boot/unlock/ownership.c
++++ b/internal-boot/unlock/ownership.c
+@@ -72,13 +72,33 @@ EFI_STATUS GuFindReleaseOwner(EFI_SYSTEM_TABLE *Table,GU_RELEASE_OWNER *Owner,BO
+     }
+   }
+   if(drivers!=1 || Owner->agent==Gu.image || Owner->agent==Gu.handle || ConsoleHandle(Table,Owner->agent))return EFI_ACCESS_DENIED;
++  UINTN children=0;
+   for(UINTN i=0;i<count;i++) {
+     const EFI_OPEN_PROTOCOL_INFORMATION_ENTRY *e=&records[i].entry;
+     if(Passive(e->Attributes))continue;
+     /* This release handles a single device driver only. DisconnectController
+        gathers children across every protocol, and physical console children
+        need not equal the System Table's virtual console handles. Refuse all
+-       child relationships instead of assuming a route alone proves isolation. */
++       child relationships instead of assuming a route alone proves isolation.
++       Exception (discrete-graphics laptop profile only): when the one PciIo
++       owner also parents the target's child controllers, those children are
++       exactly what DisconnectController(handle, agent, NULL) removes with it.
++       A child that happens to BE a console handle is still refused. */
++    if(e->Attributes==EFI_OPEN_PROTOCOL_BY_CHILD_CONTROLLER && e->AgentHandle==Owner->agent &&
++       e->ControllerHandle!=Gu.handle) {
++#if defined(GU_ALLOW_TARGET_CONSOLE)
++      if(ConsoleHandle(Table,e->ControllerHandle)) {
++        if(Log)GuLog("release refused: child record %u is a console handle\n",(unsigned)i);
++        return EFI_ACCESS_DENIED;
++      }
++      if(Log)GuLog("release child accepted: record %u child=%#llx agent=%#llx\n",(unsigned)i,
++        (unsigned long long)(UINTN)e->ControllerHandle,(unsigned long long)(UINTN)e->AgentHandle);
++      children++;continue;
++#else
++      if(Log)GuLog("release refused: active child at record %u (target-console mode not enabled)\n",(unsigned)i);
++      return EFI_ACCESS_DENIED;
++#endif
++    }
+     if(e->Attributes!=EFI_OPEN_PROTOCOL_BY_DRIVER || e->AgentHandle!=Owner->agent ||
+        e->ControllerHandle!=Gu.handle || e->OpenCount!=1) {
+       if(Log)GuLog("release refused: active child, different owner or unsupported open at record %u\n",(unsigned)i);
+@@ -91,10 +111,10 @@ EFI_STATUS GuFindReleaseOwner(EFI_SYSTEM_TABLE *Table,GU_RELEASE_OWNER *Owner,BO
+     !binding->ImageHandle || binding->ImageHandle==Gu.image)return EFI_UNSUPPORTED;
+   status=Gu.bs->HandleProtocol(binding->ImageHandle,&LoadedGuid,(VOID **)&image);
+   if(EFI_ERROR(status) || !image)return EFI_UNSUPPORTED;
+-  if(Log)GuLog("release candidate: agent=%#llx image=%#llx source=%#llx base=%#llx bytes=%llu version=%#x code_type=%u children=0\n",
++  if(Log)GuLog("release candidate: agent=%#llx image=%#llx source=%#llx base=%#llx bytes=%llu version=%#x code_type=%u children=%zu\n",
+     (unsigned long long)(UINTN)Owner->agent,(unsigned long long)(UINTN)binding->ImageHandle,
+     (unsigned long long)(UINTN)image->DeviceHandle,(unsigned long long)(UINTN)image->ImageBase,
+-    (unsigned long long)image->ImageSize,binding->Version,(unsigned)image->ImageCodeType);
++    (unsigned long long)image->ImageSize,binding->Version,(unsigned)image->ImageCodeType,children);
+   if(!image->ImageBase || !image->ImageSize || image->ImageSize>64U*1024U*1024U || image->ImageCodeType!=EfiBootServicesCode)return EFI_UNSUPPORTED;
+   Owner->image=binding->ImageHandle;Owner->base=image->ImageBase;Owner->size=image->ImageSize;
+   Owner->version=binding->Version;Owner->stop=binding->Stop;return EFI_SUCCESS;

@@ -1,0 +1,81 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Q1y1ng <252691173+Q1y1ng@users.noreply.github.com>
+Date: Sun, 25 Oct 2026 23:24:05 +0800
+Subject: [PATCH] =?UTF-8?q?fix:=20=E8=A7=82=E5=AF=9F=E6=9E=84=E5=BB=BA?=
+ =?UTF-8?q?=E5=8F=AF=E6=8C=87=E5=AE=9A=20python/profile=EF=BC=8C=E6=8F=A1?=
+ =?UTF-8?q?=E6=89=8B=E5=A4=B1=E8=B4=A5=E6=97=B6=E6=89=93=E5=8D=B0=E5=A4=B1?=
+ =?UTF-8?q?=E8=B4=A5=E6=AD=A5=E9=AA=A4?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- build-observe.ps1：新增 -Python / -HardwareProfile 透传（本机 python 是 Anaconda 2.7）
+- handoff.c：Prepare() 在 GU_DIAGNOSTIC_ONLY 下逐步骤输出 prepare: FAIL <step>，
+  避免只看到 HANDOFF STOPPED 而不知道停在哪
+---
+ internal-boot/boot/handoff.c        | 21 +++++++++++++++++++--
+ research/headless/build-observe.ps1 |  6 +++---
+ 2 files changed, 22 insertions(+), 5 deletions(-)
+
+diff --git a/internal-boot/boot/handoff.c b/internal-boot/boot/handoff.c
+index dd5153e..b6bfae4 100644
+--- a/internal-boot/boot/handoff.c
++++ b/internal-boot/boot/handoff.c
+@@ -211,11 +211,25 @@ static EFI_STATUS LoadUnlock(VOID) {
+ static EFI_STATUS Prepare(VOID *Context) {
+   (void)Context;EFI_HANDLE own=NULL,windows=NULL;
+   EFI_STATUS s=FindPartition(&GuInternalPartition,&own);
++#ifdef GU_DIAGNOSTIC_ONLY
++  if(s!=EFI_SUCCESS || own!=OwnDevice)Say(L"prepare: FAIL internal-partition (own device is not the configured unlock ESP)\r\n");
++#endif
+   if(s!=EFI_SUCCESS || own!=OwnDevice)return EFI_COMPROMISED_DATA;
+   s=FindPartition(&GuWindowsPartition,&windows);
++#ifdef GU_DIAGNOSTIC_ONLY
++  if(s!=EFI_SUCCESS || windows==own)Say(L"prepare: FAIL windows-partition (configured Windows ESP not found)\r\n");
++#endif
+   if(s!=EFI_SUCCESS || windows==own)return EFI_COMPROMISED_DATA;
+-  s=OpenLog();if(s!=EFI_SUCCESS)return s;
+-  s=Record(NULL,"internal-handoff-v1",EFI_SUCCESS);if(s!=EFI_SUCCESS)return s;
++  s=OpenLog();
++#ifdef GU_DIAGNOSTIC_ONLY
++  if(s!=EFI_SUCCESS)Say(L"prepare: FAIL open-log (missing directory or unwritable unlock ESP)\r\n");
++#endif
++  if(s!=EFI_SUCCESS)return s;
++  s=Record(NULL,"internal-handoff-v1",EFI_SUCCESS);
++#ifdef GU_DIAGNOSTIC_ONLY
++  if(s!=EFI_SUCCESS)Say(L"prepare: FAIL record\r\n");
++#endif
++  if(s!=EFI_SUCCESS)return s;
+ #ifndef GU_DIAGNOSTIC_ONLY
+   s=LoadUnlock();if(s!=EFI_SUCCESS)return s;
+ #endif
+@@ -223,6 +237,9 @@ static EFI_STATUS Prepare(VOID *Context) {
+   s=FilePath(windows,L"\\EFI\\Microsoft\\Boot\\bootmgfw.efi",&path);
+   if(s==EFI_SUCCESS)s=Table->BootServices->LoadImage(FALSE,Self,path,NULL,0,&WindowsImage);
+   if(path)Table->BootServices->FreePool(path);
++#ifdef GU_DIAGNOSTIC_ONLY
++  if(s!=EFI_SUCCESS)Say(L"prepare: FAIL load windows boot manager\r\n");
++#endif
+   if(s!=EFI_SUCCESS)return s;
+   EFI_LOADED_IMAGE_PROTOCOL *loaded=NULL;
+   s=Table->BootServices->HandleProtocol(WindowsImage,&LoadedGuid,(VOID **)&loaded);
+diff --git a/research/headless/build-observe.ps1 b/research/headless/build-observe.ps1
+index fe64e7d..1b48472 100644
+--- a/research/headless/build-observe.ps1
++++ b/research/headless/build-observe.ps1
+@@ -1,12 +1,12 @@
+ # GPL-2.0-only. Build an observational EFI only; never install or edit BootOrder.
+-param([Parameter(Mandatory)][ValidatePattern('^[D-Zd-z]$')][string]$UnlockDriveLetter,[Parameter(Mandatory)][guid]$WindowsEspGuid,[string]$Clang='clang',[string]$LldLink='lld-link')
++param([Parameter(Mandatory)][ValidatePattern('^[D-Zd-z]$')][string]$UnlockDriveLetter,[Parameter(Mandatory)][guid]$WindowsEspGuid,[string]$Clang='clang',[string]$LldLink='lld-link',[string]$Python='python',[string]$HardwareProfile='b650m-3090fe')
+ $ErrorActionPreference='Stop'
+ $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
+-& (Join-Path $repo 'internal-boot/Configure.ps1') -UnlockDriveLetter $UnlockDriveLetter -WindowsEspGuid $WindowsEspGuid
++& (Join-Path $repo 'internal-boot/Configure.ps1') -UnlockDriveLetter $UnlockDriveLetter -WindowsEspGuid $WindowsEspGuid -HardwareProfile $HardwareProfile
+ if(!$?){throw 'Local partition configuration failed'}
+ $generated=Join-Path $repo 'internal-boot/boot/generated.h'
+ if(!(Test-Path -LiteralPath $generated)){'/* Observation build: GU_DIAGNOSTIC_ONLY excludes all unlock loading. */' | Set-Content -LiteralPath $generated -Encoding ascii}
+-& (Join-Path $repo 'internal-boot/boot/build-diagnostic.ps1') -Clang $Clang -LldLink $LldLink
++& (Join-Path $repo 'internal-boot/boot/build-diagnostic.ps1') -Clang $Clang -LldLink $LldLink -Python $Python
+ if(!$?){throw 'Observation build failed'}
+ $built=Join-Path $repo 'internal-boot/boot/build/diagnostic'
+ $m=Get-Content -LiteralPath (Join-Path $built 'manifest.json') -Raw | ConvertFrom-Json

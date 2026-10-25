@@ -20,6 +20,9 @@ refs/
 # 例外：抓取证据（PROBE 的 DIAG 文本 + 驱动镜像转储）必须入库
 !captures/**
 
+# 机器本地状态（启动项 GUID、备份路径），不入库
+*.local.json
+
 
 # 上游 fork 自带独立 .git
 Windows-GPU-UNLOCK/
