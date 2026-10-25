@@ -179,7 +179,7 @@
 
 ## ✅ 最终结果（2026-10-26 00:37，RUN03）
 
-**解锁成功，且已实测。** 按键 U → 黑屏 → **19 秒进 Windows**（程序自己 `LoadImage`+`StartImage` bootmgfw）。
+**解锁成功，且已实测。** 按键 U → 黑屏 → 直接进 Windows（程序自己 `LoadImage`+`StartImage` bootmgfw）。联想开机界面报**本次开机用时 19 秒**——这是固件统计的一次开机总时长，**不是黑屏时长**；黑屏段未单独计时。
 
 RUN02 日志（`captures/runs/RUN02.txt`）已证明事务本身成功：
 

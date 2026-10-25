@@ -102,7 +102,7 @@ NVIDIA 在廉价卡上用固件微码把 FP16/BF16 的指令发射率封顶到�
 
 **③ 事务成功后自己交棒 Windows（`app.c` 的 `HandoffWindows()`）**
 **这一条是实机撞出来的**：事务成功返回固件后，BDS 要重画启动菜单，而显示驱动已被摘除 → 黑屏挂死（风扇灯全亮），用户只能断电，而解锁是易失的，成果随之丢失。
-正解：事务成功、资源全部释放后，按 **GPT 分区 GUID** 定位 Windows ESP，把该卷设备路径的 `END` 节点换成 `FILEPATH` 节点，`LoadImage` + `StartImage` 真正的 `bootmgfw.efi`。实测 **黑屏约 19 秒后进 Windows**。
+正解：事务成功、资源全部释放后，按 **GPT 分区 GUID** 定位 Windows ESP，把该卷设备路径的 `END` 节点换成 `FILEPATH` 节点，`LoadImage` + `StartImage` 真正的 `bootmgfw.efi`。实机验证：事务成功后**直接进 Windows**，联想开机界面报**本次开机用时 19 秒**（这是固件自己统计的一次开机总时长，不是黑屏时长；黑屏段我没有单独计时）。
 
 **④ 允许释放"带着自己子控制器"的驱动（`ownership.c`）**
 目标卡挂着它自己的 GOP 子控制器（`BY_CHILD_CONTROLLER`），创建者是同一个 `PciIo BY_DRIVER` 所有者。上游 `GuFindReleaseOwner` 一律拒绝任何子关系（注释说明了理由：`DisconnectController` 会跨协议收子控制器，不能假设隔离）。本机放开**仅这一种**：`BY_CHILD_CONTROLLER && agent == 唯一 owner`；如果子句柄本身是控制台句柄，仍然拒绝。
@@ -179,7 +179,7 @@ powershell -File scripts\register-unlock.ps1 -Register
 ```
 
 运行：**关机 → F12 → 选 `GPU Unlock 3060 Laptop - EXPERIMENTAL (press U)` → 出现提示按一次 `U`**。
-之后屏幕会黑，**约 19 秒后自动进 Windows**（程序自己交棒，不会回到固件菜单）。
+之后屏幕会黑，Windows 自身的驱动重新初始化显卡后才恢复画面。程序会自己交棒，**不会回到固件菜单**。本机实测联想开机界面报**本次开机用时 19 秒**（按电源键到进系统这一段，固件统计口径）；黑屏具体持续多久我没有单独测，别拿 19 秒当黑屏时长。
 
 每次运行都会在 `\RTX3090-UNLOCK\RUNnn\REPORT.TXT` 留下完整日志（布局、FWSEC、SS0 读回、FLR、containment）。
 
@@ -197,7 +197,7 @@ powershell -File scripts\register-unlock.ps1 -Rollback   # 提权，删启动项
 
 | 现象 | 处理 |
 |---|---|
-| 按 U 后黑屏 20~60 s 才进系统 | **正常**。显示驱动被摘除，要等 Windows 重新初始化显卡 |
+| 按 U 后屏幕变黑，过一会儿 Windows 才亮起来 | **正常**。显示驱动被摘除，要等 Windows 重新初始化显卡。本机整个开机（联想计时）19 秒；黑屏段本身未单独计时 |
 | 超过 2~3 分钟无任何反应 | **长按电源键 10 秒**断电，再正常开机。早已验证：断电即恢复出厂，不存在"改坏显卡" |
 | 屏幕打印 `STOP: cleanup cannot be proven` | 该分支**故意不重置、不重试、死循环**（防止带着未证明的状态进 Windows）。长按电源键断电 |
 | 想彻底放弃 | BIOS 里把 Windows 启动项调回第一，或跑 5.5 的撤销 |
