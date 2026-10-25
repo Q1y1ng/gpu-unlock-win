@@ -104,13 +104,37 @@
 而 #58（**+35%/+49%**，SS1 保持 `0x4`）与 predator（**+85%**，SS1 保持 `0x2`）**都是在不碰 SS1 的情况下拿到全部 FP16/BF16 收益**的。#58 还明确记录了「SS0-only 配置下 TF32/FP32 不变」。
 → **结论：走 `entryLatchedSs1Preserve`**。收益一样，少一次未经验证的寄存器写，风险更低。
 
+## ⚠️ 23:40 自查发现的两处错误（必须在按 U 之前纠正）
+
+**错误 1：把 profile 补丁打在了错误的源码树上。**
+
+`unlock/` 与 `internal-boot/unlock/` 是**两套独立实现**，行为不同：
+
+| | `unlock/`（legacy 手工版） | `internal-boot/unlock/`（profile 化） |
+|---|---|---|
+| `port.h` | 硬编码 `GU_BOARD_ID 0x220410de` 等 3090 常量，**不 include `machine-profile.h`** | 第 6 行 `#include "machine-profile.h"`，全部常量由 profile 给出 |
+| chip 检查 | `app.c:338` 硬编码 `chip!=0xb72000a1` | `app.c:292` `chip!=GU_CHIP_ID` |
+| PROM 检查 | `app.c:376` 硬编码 `8ea297373e…`（3090 的 PROM 哈希） | `app.c:325` `PromCheck()` 走 profile |
+| 能否靠 `-D` 改目标 | **不能**（`GU_TARGET_PCI_ID` 全仓库 0 处引用，我加的 `-D` 是死参数） | 能，`-DGU_PROFILE_*` |
+
+我之前把混合 GOP 的 `DisplayCheck()` 加进了 `unlock/app.c`、把 profile 表加进了 `unlock/build.ps1` —— 那条路无论怎么传参，编出来的仍然是**认 3090 PROM 哈希的二进制**，会在 `Stage="prom"` 直接失败。
+
+**正确做法**：改用 `internal-boot/unlock/` 树，需要两处移植（都还没做）：
+1. `internal-boot/unlock/build.ps1` 的 `$hwTable` + `-HardwareProfile` ValidateSet 增加 `lenovo-82rf-3060` 一行（`HeadlessOnly=$false`，我们要的是手工 U 确认路径）
+2. 把 `unlock/app.c:128-192` 那段混合拓扑 `DisplayCheck()`（`HybridGopIsTarget`）搬到 `internal-boot/unlock/app.c`（那边的 `DisplayCheck()` 在第 90 行，仍是 AMD 专用 `AmdGopParent`）
+
+**错误 2：`entryLatchedSs1Full` 是错的选择** —— 见上「由此推翻一个此前的选型」。
+
+> 佐证：我们跑通的 `OBSERVE.EFI` 来自 `research/headless/build-observe.ps1`（走 `internal-boot/unlock/` 树），它能正确认出本机 GPU，正是因为那一树的 `machine-profile.h` 默认值已经是 `GU_PROFILE_LENOVO_82RF`。
+
 ## 下一步
 
 1. ~~生成固件资产~~ ✅ 5/5 校验通过
-2. ~~给 `unlock/app.c` 的 `DisplayCheck()` 加本机混合拓扑分支~~ ✅
-3. ~~`unlock/build.ps1` 增加 `lenovo-82rf-3060` 表项~~ ✅
-4. 以 **`-StockProfile entryLatchedSs1Preserve`** 编译实验 EFI → 传到 `S:`（`\ASSETS\` + `\EFI\GPUUnlock\`）→ 登记启动项 → 冷启动 → 按 U → 回固件 → 选 Windows（不重启）
-5. 读回 SS0/SS1 确认 → 跑 `E:\AI\gpu-unlock-bench\bench.py unlocked` 出新旧对照
+2. ~~`unlock/app.c` 的 `DisplayCheck()` 混合拓扑分支~~ ✅ **但打在了错误的树上，需搬到 `internal-boot/unlock/app.c`**
+3. ~~`build.ps1` 增加 `lenovo-82rf-3060` 表项~~ ✅ 同样**打在了错误的树上**，需在 `internal-boot/unlock/build.ps1` 重做
+4. 以 **`internal-boot/unlock/build.ps1 -ExperimentalUnlock -StockProfile entryLatchedSs1Preserve -HardwareProfile lenovo-82rf-3060`** 编译手工版 EFI
+5. 传到 `S:`：`\ASSETS\` 放 5 个固件资产、`\EFI\...\` 放 EFI → 用 `Install.ps1 -RegisterManual` 或复用已登记的启动项 → 冷启动 → 按 **U** → 回固件 → 选 Windows（不重启）
+6. 读回 SS0/SS1 确认 → 跑 `E:\AI\gpu-unlock-bench\bench.py unlocked` 出新旧对照
 
 ## 风险
 
