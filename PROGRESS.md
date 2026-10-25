@@ -119,7 +119,7 @@
 
 我之前把混合 GOP 的 `DisplayCheck()` 加进了 `unlock/app.c`、把 profile 表加进了 `unlock/build.ps1` —— 那条路无论怎么传参，编出来的仍然是**认 3090 PROM 哈希的二进制**，会在 `Stage="prom"` 直接失败。
 
-**正确做法**：改用 `internal-boot/unlock/` 树，需要两处移植（都还没做）：
+**正确做法**：改用 `internal-boot/unlock/` 树，需要两处移植（**已于 23:30 完成**）：
 1. `internal-boot/unlock/build.ps1` 的 `$hwTable` + `-HardwareProfile` ValidateSet 增加 `lenovo-82rf-3060` 一行（`HeadlessOnly=$false`，我们要的是手工 U 确认路径）
 2. 把 `unlock/app.c:128-192` 那段混合拓扑 `DisplayCheck()`（`HybridGopIsTarget`）搬到 `internal-boot/unlock/app.c`（那边的 `DisplayCheck()` 在第 90 行，仍是 AMD 专用 `AmdGopParent`）
 
@@ -127,14 +127,43 @@
 
 > 佐证：我们跑通的 `OBSERVE.EFI` 来自 `research/headless/build-observe.ps1`（走 `internal-boot/unlock/` 树），它能正确认出本机 GPU，正是因为那一树的 `machine-profile.h` 默认值已经是 `GU_PROFILE_LENOVO_82RF`。
 
+## 溯源复核（2026-10-25 23:4x，独立子代理）
+
+子代理用**上游 pinned 路径**独立重算了一遍全部资产：`ghfast.top` clone `Zagitta/gpu-unlock` → `checkout --detach 0ebdb1c6…` → `fetch_artifacts.py`（两个钉住输入都过 SHA256，`--offline` 复验也过）→ `tar.exe` 解源包 → `generate_v67.py` + `extract_boot_assets.py` → `verify_assets.py` **RESULT: PASS**。
+
+它拿到了**那个 exact pinned 的 300 MB 包**（`nvidia-utils-610.43.03-1-x86_64_v3.pkg.tar.zst`，sha256 `e17e7c92…86e9`），手段是 `curl --resolve archive.cachyos.org:443:104.18.33.7` 钉到另一台 Cloudflare 边缘 IP（1.27 MB/s vs 20 KB/s）。
+
+**关键结论**：它产出的 `fw-build/assets-pinned/` 与本文件上面记录的、我用两条捷径做出的 5 个文件 **逐字节相同，且都等于 `unlock/assets.json` 的钉值**；`NVIDIA-LICENSE` 也命中 notice 钉值 `c692fb14…07ad`。即：
+
+- 「v67 本地合成」 ✔ 与官方 `build_payload()` 输出一致
+- 「gsp 从 NVIDIA `.run` 抽取」 ✔ 与官方包内文件一致
+
+→ 写进 S: 的那份资产链是有据可查的，不是"看起来能跑"。
+
 ## 下一步
 
-1. ~~生成固件资产~~ ✅ 5/5 校验通过
-2. ~~`unlock/app.c` 的 `DisplayCheck()` 混合拓扑分支~~ ✅ **但打在了错误的树上，需搬到 `internal-boot/unlock/app.c`**
-3. ~~`build.ps1` 增加 `lenovo-82rf-3060` 表项~~ ✅ 同样**打在了错误的树上**，需在 `internal-boot/unlock/build.ps1` 重做
-4. 以 **`internal-boot/unlock/build.ps1 -ExperimentalUnlock -StockProfile entryLatchedSs1Preserve -HardwareProfile lenovo-82rf-3060`** 编译手工版 EFI
-5. 传到 `S:`：`\ASSETS\` 放 5 个固件资产、`\EFI\...\` 放 EFI → 用 `Install.ps1 -RegisterManual` 或复用已登记的启动项 → 冷启动 → 按 **U** → 回固件 → 选 Windows（不重启）
-6. 读回 SS0/SS1 确认 → 跑 `E:\AI\gpu-unlock-bench\bench.py unlocked` 出新旧对照
+1. ~~生成固件资产~~ ✅ 5/5 校验通过，且已被独立复算确认
+2. ~~`internal-boot/unlock/app.c` 混合拓扑 `DisplayCheck()`~~ ✅（已打在**正确的**树上）
+3. ~~`internal-boot/unlock/build.ps1` 增加 `lenovo-82rf-3060` 表项~~ ✅
+4. ~~编译手工版实验 EFI + 部署到 S: + 登记启动项~~ ✅
+   - `RTX3060-LAPTOP-EXPERIMENTAL-entryLatchedSs1Preserve.EFI`，65,536 B，sha256 `403d7893…ec617`
+   - S:`\EFI\WindowsGPUUnlock\UNLOCK-3060-MANUAL.EFI` + S:`\RTX3090-UNLOCK\ASSETS\`（5 个）
+   - 启动项 `{b05c3bb8-d07b-11f1-b16c-30894a35f1b9}`「GPU Unlock 3060 Laptop - EXPERIMENTAL (press U)」，顺序末尾
+   - BCD 备份 `C:\ProgramData\WindowsGPUUnlock\UnlockBackups\20261025-234034566`
+   - 回滚：`powershell -File scripts\register-unlock.ps1 -Rollback`（需提权）
+5. **冷启动 → F12 → 选该启动项 → 出现提示按一次 U → 回固件 → 进 Windows**
+6. 读 `S:\RTX3090-UNLOCK\RUN00\REPORT.TXT` 确认事务与 SS0/SS1 读回 → 跑 `bench.py unlocked` 出新旧对照
+
+## 手工版被放开的一处闸门（必须记下来）
+
+手工版 `app_io.c` 的 `UsbPath()` 原本**只允许从 USB 设备路径启动**（设备路径里必须有 `MSG_USB` 节点）。本机 H:/U: 两块移动盘都是 NTFS 整盘、没有空 FAT32 U 盘，所以在我们这个 profile 下改成复用上游 internal-boot 自己的媒体策略 `GuAllowedMediaPath(path, TRUE)`：要求设备路径里**有且只有一个 GPT HARDDRIVE 节点、且其 16 字节分区签名 == `boot/platform-config.h` 里 Configure.ps1 生成的专用分区 GUID**（`4c2a61ef-…`，即 S:），Windows ESP 的 `2e82c91f-…` 仍然被拒。**仅 `GU_PROFILE_LENOVO_82RF` 生效**，其它 profile 行为不变。
+
+## 风险
+
+- 事务含 **FLR**：若那个无路径控制台 GOP 实际挂在独显上，操作瞬间会黑屏（程序 1~2 秒后返回固件，F12 可重进 Windows）
+- 固件资产哈希不符会被拒，不要用近似版本凑
+- 失败时若打印 `STOP: cleanup cannot be proven`：该分支**不重置、不重试、死循环**，必须长按电源键断电
+- 实测硬编码检查（`0x030000a1`、cfg[0xc8]=`0x00050011`、`BAR0=0x5e000000`、`subsystem=0x3ae817aa`、ROM BAR 未使能、PCIe DevCtl bit21）在 DIAG01 的 PCI 配置转储里**全部吻合**；本机 `Command=0x0003`（Memory+IO 开、BusMaster 关）也正好满足预检
 
 ## 风险
 

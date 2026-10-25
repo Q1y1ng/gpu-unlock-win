@@ -1,0 +1,2 @@
+{"path": "RTX3060-LAPTOP-EXPERIMENTAL-entryLatchedSs1Preserve.EFI", "bytes": 65536, "sha256": "403d78938ad859a1a90e0e9222380c60f71eae2ec1cbf432deed7641a94ec617", "machine": "AMD64", "subsystem": 10, "entry": "efi_main", "entry_rva": 4096, "imports": 0, "iat": 0, "delay_imports": 0, "nx": true, "dynamic_base": true}
+Built RTX3060-LAPTOP-EXPERIMENTAL-entryLatchedSs1Preserve.EFI; ExperimentalUnlock=True; hardware untested.
