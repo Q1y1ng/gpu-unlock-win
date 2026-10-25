@@ -3,6 +3,7 @@
 # reboot, no BIOS change. ASCII-only: Windows PowerShell 5.1 reads BOM-less .ps1 as ANSI.
 param(
     [switch]$Register,
+    [switch]$ReplaceEfi,
     [switch]$Rollback
 )
 $ErrorActionPreference = 'Stop'
@@ -16,7 +17,8 @@ $bootPath    = '\EFI\WindowsGPUUnlock\UNLOCK-3060-MANUAL.EFI'
 $entryName   = 'GPU Unlock 3060 Laptop - EXPERIMENTAL (press U)'
 
 $efiSource = Join-Path $repo 'internal-boot\unlock\build\experimental\entryLatchedSs1Preserve\RTX3060-LAPTOP-EXPERIMENTAL-entryLatchedSs1Preserve.EFI'
-$efiSha    = '403D78938AD859A1A90E0E9222380C60F71EAE2EC1CBF432DEED7641A94EC617'
+$efiSha    = 'FC49D006B7035BB399C80AE5446431C7D44992B21C3887C4B33E847FAE4A0A68'
+$efiBytes  = 66560
 
 $assetSource = Join-Path $repo 'assets'
 $assets = @(
@@ -91,7 +93,15 @@ try {
     $efiDir = Split-Path -Parent $efiTarget
     if (!(Test-Path -LiteralPath $efiDir)) { [void][IO.Directory]::CreateDirectory($efiDir) }
     if ((Get-FileHash -LiteralPath $efiSource -Algorithm SHA256).Hash -ne $efiSha) { throw 'Local unlock EFI does not match the reviewed hash' }
-    StageFile $efiSource $efiTarget $efiSha 65536
+    if ((Test-Path -LiteralPath $efiTarget) -and ((Get-FileHash -LiteralPath $efiTarget -Algorithm SHA256).Hash -ne $efiSha)) {
+        # A newer reviewed build replaces our own previously staged image at the same
+        # path. Keep the old one beside it so a failed boot can be diffed later.
+        if (!$ReplaceEfi) { throw ('Staged EFI differs from this build; pass -ReplaceEfi to replace it: ' + $efiTarget) }
+        $keep = $efiTarget + '.prev-' + (Get-Date -Format 'yyyyMMdd-HHmmss')
+        Move-Item -LiteralPath $efiTarget -Destination $keep
+        Write-Output ('previous staged EFI kept as ' + $keep)
+    }
+    StageFile $efiSource $efiTarget $efiSha $efiBytes
 
     $assetDir = Join-Path ($drive + ':\') 'RTX3090-UNLOCK\ASSETS'
     if (!(Test-Path -LiteralPath $assetDir)) { [void][IO.Directory]::CreateDirectory($assetDir) }

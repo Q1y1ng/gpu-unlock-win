@@ -1,12 +1,12 @@
 ﻿**********************
 Windows PowerShell 脚本开始
-开始时间: 20261025234030
+开始时间: 20261026000723
 用户名: LUO\s3431
 RunAs 用户: LUO\s3431
 配置名称: 
 计算机: LUO (Microsoft Windows NT 10.0.22631.0)
-主机应用程序: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -File E:\AI\gpu-unlock-win\scripts\register-unlock.ps1 -Register
-进程 ID: 13532
+主机应用程序: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -File E:\AI\gpu-unlock-win\scripts\register-unlock.ps1 -ReplaceEfi
+进程 ID: 6008
 PSVersion: 5.1.22621.5624
 PSEdition: Desktop
 PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.22621.5624
@@ -18,20 +18,16 @@ SerializationVersion: 1.1.0.1
 **********************
 target confirmed: S: guid={4c2a61ef-99fe-4a36-b797-e2b906058734} size=1073741824 fs=FAT32
 === stage files ===
-staged: S:\EFI\WindowsGPUUnlock\UNLOCK-3060-MANUAL.EFI 65536 bytes
-staged: S:\RTX3090-UNLOCK\ASSETS\booter_load_ga102.bin 61256 bytes
-staged: S:\RTX3090-UNLOCK\ASSETS\v67-ga102-610.43.03.bin 64000 bytes
-staged: S:\RTX3090-UNLOCK\ASSETS\gsp_ga10x.bin 84277400 bytes
-staged: S:\RTX3090-UNLOCK\ASSETS\gsp_boot_ga102.bin 24576 bytes
-staged: S:\RTX3090-UNLOCK\ASSETS\gsp_boot_desc_ga102.bin 84 bytes
+previous staged EFI kept as S:\EFI\WindowsGPUUnlock\UNLOCK-3060-MANUAL.EFI.prev-20261026-000726
+staged: S:\EFI\WindowsGPUUnlock\UNLOCK-3060-MANUAL.EFI 66560 bytes
+already staged: S:\RTX3090-UNLOCK\ASSETS\booter_load_ga102.bin
+already staged: S:\RTX3090-UNLOCK\ASSETS\v67-ga102-610.43.03.bin
+already staged: S:\RTX3090-UNLOCK\ASSETS\gsp_ga10x.bin
+already staged: S:\RTX3090-UNLOCK\ASSETS\gsp_boot_ga102.bin
+already staged: S:\RTX3090-UNLOCK\ASSETS\gsp_boot_desc_ga102.bin
 asset root: S:\RTX3090-UNLOCK\ASSETS
-=== register ===
-created entry {b05c3bb8-d07b-11f1-b16c-30894a35f1b9}
-entry configured and appended to the firmware order
-=== verify ===
-registered GPU Unlock 3060 Laptop - EXPERIMENTAL (press U) -> {b05c3bb8-d07b-11f1-b16c-30894a35f1b9} at the end of the firmware order
-backup: C:\ProgramData\WindowsGPUUnlock\UnlockBackups\20261025-234034566
+Staging only; no boot entry changes.
 **********************
 Windows PowerShell 脚本结束
-结束时间: 20261025234036
+结束时间: 20261026000727
 **********************
