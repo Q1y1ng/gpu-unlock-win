@@ -1,0 +1,27 @@
+﻿**********************
+Windows PowerShell 脚本开始
+开始时间: 20261026005454
+用户名: LUO\s3431
+RunAs 用户: LUO\s3431
+配置名称: 
+计算机: LUO (Microsoft Windows NT 10.0.22631.0)
+主机应用程序: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -File E:\AI\gpu-unlock-win\scripts\set-boot-first.ps1 -First
+进程 ID: 18336
+PSVersion: 5.1.22621.5624
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.22621.5624
+BuildVersion: 10.0.22621.5624
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+unlock entries found: 1 -> {b05c3bb8-d07b-11f1-b16c-30894a35f1b9}
+order before: {bootmgr},{5c0d816f-4daa-11ef-a847-806e6f6e6963},{5c0d8170-4daa-11ef-a847-806e6f6e6963},{5c0d8171-4daa-11ef-a847-806e6f6e6963},{b05c3bb7-d07b-11f1-b16c-30894a35f1b9},{b05c3bb8-d07b-11f1-b16c-30894a35f1b9}
+setting: {b05c3bb8-d07b-11f1-b16c-30894a35f1b9},{bootmgr},{5c0d816f-4daa-11ef-a847-806e6f6e6963},{5c0d8170-4daa-11ef-a847-806e6f6e6963},{5c0d8171-4daa-11ef-a847-806e6f6e6963},{b05c3bb7-d07b-11f1-b16c-30894a35f1b9}
+order after:  {b05c3bb8-d07b-11f1-b16c-30894a35f1b9},{bootmgr},{5c0d816f-4daa-11ef-a847-806e6f6e6963},{5c0d8170-4daa-11ef-a847-806e6f6e6963},{5c0d8171-4daa-11ef-a847-806e6f6e6963},{b05c3bb7-d07b-11f1-b16c-30894a35f1b9}
+boot order verified; no BootNext set; every entry preserved
+**********************
+Windows PowerShell 脚本结束
+结束时间: 20261026005455
+**********************
